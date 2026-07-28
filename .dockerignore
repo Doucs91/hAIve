@@ -1,0 +1,17 @@
+# Keep the build context clean and reproducible: install/build happen inside
+# the image, so host artifacts must never leak in.
+.git
+node_modules
+**/node_modules
+**/dist
+**/.tsbuildinfo
+coverage
+**/coverage
+
+# Local-only / gitignored working data.
+.ai/.runtime
+sandaga-monorepo
+*.log
+
+# Nothing here is needed to start the MCP server.
+docs/demo/*.gif
