@@ -254,7 +254,7 @@ export function registerDoctor(program: Command): void {
             severity: "info",
             code: "pending-review",
             message: `${proposed.length} memor${proposed.length === 1 ? "y is" : "ies are"} proposed and awaiting validation.`,
-            fix: "hivelore memory pending      # list them\nhaive memory auto-promote   # promote those with high read_count",
+            fix: "hivelore memory pending       # list them\nhivelore memory approve <id>  # validate a proposed one",
           });
         }
 
@@ -273,7 +273,7 @@ export function registerDoctor(program: Command): void {
             code: "stale-draft-memories",
             message:
               `${oldDrafts.length} draft memor${oldDrafts.length === 1 ? "y has" : "ies have"} been in draft status for 30+ days: ${ids}${more}`,
-            fix: "hivelore memory approve <id>   # activate\nhaive memory delete <id>     # or delete if obsolete",
+            fix: "hivelore memory approve <id>   # activate\nhivelore memory delete <id>    # or delete if obsolete",
           });
         }
 

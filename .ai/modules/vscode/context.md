@@ -1,10 +1,10 @@
 # Module: vscode (VS Code extension)
 
-Surfaces hAIve memories inline (tree view, code lens, status bar, briefing panel) and a Strategic
+Surfaces Hivelore memories inline (tree view, code lens, status bar, briefing panel) and a Strategic
 Cockpit over the CLI's observability. Versioned independently — **not** part of the npm lockstep.
 
 ## Conventions specific to this module
-- **All hAIve CLI invocations go through `runHaive()`** (`harnessHealth.ts`) — never raw `child_process`
+- **All Hivelore CLI invocations go through `runHaive()`** (`harnessHealth.ts`) — never raw `child_process`
   (`cp.exec`/`cp.spawn`/`cp.execFile`). `runHaive` is the single place that shells out; it centralizes
   the configured binary, cwd/root resolution, and error handling.
 - Register every disposable (`vscode.window.createTreeView`, `registerCommand`, `onDid*`) in

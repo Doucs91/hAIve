@@ -68,8 +68,8 @@ Several agents **and** the human (Sady) work on this repo in parallel with manua
 
 - `2026-04-25-architecture-embedderlike-interface` (team/architecture) — Architecture Embedderlike Interface _(applies to: packages/embeddings/src/embedder.ts)_
 - `2026-04-25-architecture-pure-tool-handlers` (team/architecture) — Architecture Pure Tool Handlers _(applies to: packages/mcp/src/tools)_
-- `2026-04-25-convention-always-run-tests-before-commit` (team/convention) — hAIve Release Verification Chain _(applies to: .github/workflows/ci.yml, package.json, scripts/verify-build-artifacts.mjs)_
-- `2026-04-25-convention-use-pnpm-workspaces` (team/convention) — hAIve Uses Pinned pnpm Workspaces _(applies to: package.json, pnpm-workspace.yaml)_
+- `2026-04-25-convention-always-run-tests-before-commit` (team/convention) — Hivelore Release Verification Chain _(applies to: .github/workflows/ci.yml, package.json, scripts/verify-build-artifacts.mjs)_
+- `2026-04-25-convention-use-pnpm-workspaces` (team/convention) — Hivelore Uses Pinned pnpm Workspaces _(applies to: package.json, pnpm-workspace.yaml)_
 - `2026-04-25-decision-esm-only` (team/decision) — Decision Esm Only _(applies to: tsconfig.base.json)_
 - `2026-04-25-gotcha-tsup-externals-required` (team/gotcha) — Gotcha Tsup Externals Required _(applies to: packages/cli/tsup.config.ts, packages/mcp/tsup.config.ts)_
 - `2026-04-27-decision-zod-error-formatting-no-direct-import` (team/decision) — Decision Zod Error Formatting No Direct Import _(applies to: packages/cli/src/index.ts)_

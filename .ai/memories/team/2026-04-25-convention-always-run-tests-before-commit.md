@@ -21,9 +21,9 @@ revision_count: 0
 requires_human_approval: false
 validated_by: null
 ---
-# hAIve Release Verification Chain
+# Hivelore Release Verification Chain
 
-hAIve tests import freshly built workspace `dist` artifacts, so the release-quality local check is the same ordered chain as CI:
+Hivelore tests import freshly built workspace `dist` artifacts, so the release-quality local check is the same ordered chain as CI:
 
 ```bash
 pnpm -r build

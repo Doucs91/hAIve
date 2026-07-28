@@ -1,4 +1,4 @@
-# Module: mcp (`@hiveai/mcp`)
+# Module: mcp (`@hivelore/mcp`)
 
 Policy-aware MCP server built on `@modelcontextprotocol/sdk` (stdio). Bundled into the CLI.
 

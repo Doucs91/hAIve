@@ -1319,7 +1319,7 @@ export async function runHaiveMcpStdio(options: { root?: string }): Promise<void
   const { server, context } = createHaiveServer({ root: options.root, env: process.env });
   await writeMcpRuntimeMarker(context).catch(() => { /* diagnostics must never prevent MCP startup */ });
   console.error(
-    `[haive-mcp] starting server v${SERVER_VERSION} (project root: ${context.paths.root})`,
+    `[hivelore-mcp] starting server v${SERVER_VERSION} (project root: ${context.paths.root})`,
   );
   await server.connect(new StdioServerTransport());
 }

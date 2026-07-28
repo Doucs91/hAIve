@@ -71,7 +71,7 @@ export async function runPending(opts: PendingOptions): Promise<void> {
           );
           console.log(`    ${ui.dim(path.relative(root, filePath))}`);
         }
-        if (proposed.length > 0) console.log(ui.dim(`  → hivelore memory approve <id>  or  hivelore memory auto-promote`));
+        if (proposed.length > 0) console.log(ui.dim(`  → hivelore memory approve <id>  or  hivelore memory approve --all`));
         console.log();
       }
 

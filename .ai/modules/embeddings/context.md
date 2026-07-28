@@ -1,4 +1,4 @@
-# Module: embeddings (`@hiveai/embeddings`)
+# Module: embeddings (`@hivelore/embeddings`)
 
 Optional, fully-offline semantic ranking. Wraps Transformers.js (`Xenova/bge-small-en-v1.5`, 384 dims).
 
@@ -9,7 +9,7 @@ one-time model download.
 ## Conventions specific to this module
 - Exposes the `EmbedderLike` interface (`model`, `dimension`, `encode`) so tests inject a deterministic
   `FakeEmbedder` instead of downloading the model. Lazy-loads the pipeline on first use.
-- Must ship **bundled** with `@hiveai/cli` and `@hiveai/mcp` (not a bare peer dep) or global installs
+- Must ship **bundled** with `@hivelore/cli` and `@hivelore/mcp` (not a bare peer dep) or global installs
   silently lose semantic ranking and `code_search`.
 
 ## Gotchas

@@ -11,6 +11,6 @@ if (parsed.versionOnly) {
 }
 
 runHaiveMcpStdio({ root: parsed.root }).catch((err: unknown) => {
-  console.error("[haive-mcp] fatal:", err instanceof Error ? err.message : err);
+  console.error("[hivelore-mcp] fatal:", err instanceof Error ? err.message : err);
   process.exit(1);
 });

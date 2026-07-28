@@ -21,11 +21,11 @@ revision_count: 0
 requires_human_approval: false
 validated_by: null
 ---
-# hAIve Uses Pinned pnpm Workspaces
+# Hivelore Uses Pinned pnpm Workspaces
 
 This repo is pinned to `pnpm@9.14.2` in root `packageManager`; do not use npm/yarn workspace commands for local development or release checks.
 
-Cross-package hAIve dependencies must stay `workspace:*`. Using published semver ranges such as `^0.12.1` can make pnpm resolve stale registry packages instead of local workspace code, hiding source changes from dependent package builds.
+Cross-package Hivelore dependencies must stay `workspace:*`. Using published semver ranges such as `^0.12.1` can make pnpm resolve stale registry packages instead of local workspace code, hiding source changes from dependent package builds.
 
 Canonical local commands:
 

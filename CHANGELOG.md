@@ -6,6 +6,27 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.53.2] — Rename cleanup: kill remaining `haive` leftovers on the user surface
+
+Follow-up to the v0.51.0 rename (`haive` binary removed). A pass over the surfaces a user or an
+MCP directory (Glama) actually sees:
+
+- **`hivelore doctor` fix hints** no longer point at the removed `haive` binary — and no longer
+  suggest the non-existent `memory auto-promote` command. `pending-review` now suggests
+  `hivelore memory approve <id>`; `stale-draft-memories` suggests `hivelore memory delete <id>`.
+  `memory pending` prints `hivelore memory approve --all` instead of the dead `auto-promote`.
+- **MCP server logs** now use the `[hivelore-mcp]` prefix (startup + fatal) instead of the legacy
+  `[haive-mcp]` — visible in any client's MCP log pane and in the Glama introspection log.
+- **Corpus/bridges**: the two pinned convention memories and the module contexts were rebranded
+  `hAIve`/`@hiveai/*` → `Hivelore`/`@hivelore/*`; all 12 generated bridge files regenerated so the
+  team's context no longer shows the old brand. Internal identifiers (`runHaive`, `HAIVE_*`,
+  `haive.config.json`, `<!-- haive:… -->` markers, bridge filenames) stay unchanged — backward
+  compatible by design (see [0.30.0]).
+- **Docker/Glama**: added a repository `Dockerfile` (+ `.dockerignore`) that builds the pnpm
+  workspace and runs `hivelore mcp --stdio`, verified to answer the MCP `initialize` + `tools/list`
+  introspection the Glama listing check requires.
+
+
 ## [0.53.1] — MCP Registry publishing metadata
 
 - `@hivelore/mcp` now carries `mcpName: "io.github.Doucs91/hivelore"` so the package can be published
