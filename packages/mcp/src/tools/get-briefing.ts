@@ -99,7 +99,14 @@ export const GetBriefingInputSchema = {
     .positive()
     .default(8)
     .describe("Cap on memories surfaced regardless of token budget"),
-  include_project_context: z.boolean().default(true),
+  include_project_context: z
+    .boolean()
+    .default(true)
+    .describe(
+      "Include the `.ai/project-context.md` body (default ON). Set false when the agent already has the " +
+      "project overview and you only want the module/memory layers — see `dedupe_project_context` for the " +
+      "automatic, session-aware version of the same saving.",
+    ),
   dedupe_project_context: z
     .boolean()
     .optional()
@@ -107,7 +114,13 @@ export const GetBriefingInputSchema = {
       "Token saver (default ON): skip re-emitting the project-context body if an identical copy was " +
       "already sent within the last few minutes this session (the agent still has it). Set false to always include it.",
     ),
-  include_module_contexts: z.boolean().default(true),
+  include_module_contexts: z
+    .boolean()
+    .default(true)
+    .describe(
+      "Include the `.ai/modules/<name>/context.md` slices inferred from `files` (default ON). Set false to " +
+      "keep the briefing to project context + memories. Overridden by `budget_preset` when that is set.",
+    ),
   semantic: z
     .boolean()
     .default(true)

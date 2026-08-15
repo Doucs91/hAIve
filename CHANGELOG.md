@@ -6,6 +6,27 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.53.3] — MCP tool-definition polish for the Glama listing
+
+Glama grades a listed server on **Tool Definition Quality (70%) + Server Coherence (30%)**, where the
+server-level score is `60% × mean + 40% × minimum` — a single weak tool drags the whole grade down.
+An audit of the 13 tools in the default `enforcement` profile found two defects, both fixed here
+before cutting the Glama release that freezes those definitions as the graded input:
+
+- **`get_briefing`**: `include_project_context` and `include_module_contexts` were the only two
+  parameters in the entire exposed surface shipping without a JSON-Schema `description`, costing on
+  the *Parameter Semantics* axis (15% of the per-tool score). Both now document what they include,
+  when to turn them off, and how they interact with `dedupe_project_context` / `budget_preset`.
+  All 13 tools are now at 100% documented parameters.
+- **`pre_commit_check`**: an internal layer-map annotation had leaked into the description as a
+  bracketed aside wedged between "Combines three signals:" and the list of those three signals,
+  breaking the opening sentence (*Purpose Clarity*, 25%, and *Conciseness & Structure*, 10%). The
+  information is kept — it usefully places the tool against `hivelore enforce check` — but moved
+  below the list and rewritten as prose.
+
+No behaviour change: descriptions and schema metadata only.
+
+
 ## [0.53.2] — Rename cleanup: kill remaining `haive` leftovers on the user surface
 
 Follow-up to the v0.51.0 rename (`haive` binary removed). A pass over the surfaces a user or an
