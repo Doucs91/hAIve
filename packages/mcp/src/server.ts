@@ -272,6 +272,12 @@ function jsonResult(data: unknown) {
 export const ENFORCEMENT_PROFILE_TOOLS = [
   "get_briefing",
   "mem_save",
+  // Correcting a memory is part of the default loop, not a maintenance chore: `mem_save` rejects a
+  // duplicate body and tells the agent to "use mem_update to modify", so leaving mem_update out of
+  // this profile pointed the agent at a tool it could not call — its only way out was a near-dup
+  // memory. Deletion deliberately stays maintenance-only: `mem_delete` unlinks the file with no
+  // guard, and dropping a block-sensor memory silently removes enforcement.
+  "mem_update",
   "mem_tried",
   "mem_search",
   "mem_get",
@@ -293,7 +299,6 @@ export const MAINTENANCE_PROFILE_TOOLS = [
   "get_project_context",
   "bootstrap_project_save",
   "mem_resolve_project",
-  "mem_update",
   "mem_approve",
   "mem_reject",
   "mem_pending",
@@ -1178,7 +1183,8 @@ export function createHaiveServer(
   registerTool(
     "pre_commit_check",
     [
-      "One-shot 'should I block this commit?' check. Combines three signals:",
+      "One-shot 'should I block this commit?' check. Combines three signals, all run internally by",
+      "this one call — you do not invoke them separately:",
       "",
       "  1. anti_patterns_check — known gotchas/attempts that match the diff",
       "  2. mem_for_files       — conventions/decisions anchored to touched files",

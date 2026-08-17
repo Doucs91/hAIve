@@ -6,6 +6,31 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.53.4] — Expose mem_update in the default MCP profile
+
+The default `enforcement` profile was **create-only** for memories: it shipped `mem_save` but no way
+to correct what was written. That is a real defect, not a cosmetic one — `mem_save` rejects a
+duplicate body with the message *"use `mem_update` to modify"*, so the agent was pointed at a tool it
+could not call, and its only escape was to write a near-duplicate memory that pollutes the corpus
+everything else ranks over.
+
+- **`mem_update` added to `ENFORCEMENT_PROFILE_TOOLS`** (13 → 14 tools), removed from the maintenance
+  list which already spreads enforcement. The memory lifecycle in the default profile is now
+  create / read / search / verify / **update**.
+- **`mem_delete` deliberately NOT added.** `memDelete` unlinks the file with no confirmation and no
+  archive, and deleting a memory that carries a **block sensor** silently removes enforcement —
+  the very thing the `sensor-weakened` gate exists to surface. Deletion stays a maintenance-profile,
+  human-initiated operation. Rationale recorded in
+  `2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete`.
+- **`pre_commit_check` description** now states that the three signals it names
+  (`anti_patterns_check`, `mem_for_files`, `mem_verify`) are run *internally by that one call* and are
+  not invoked separately — two of the three are not in the default profile, so naming them bare read
+  as a pointer to uncallable tools.
+
+Found by auditing every tool name referenced in the exposed descriptions against the profile's actual
+surface; `mem_save → mem_update` was the only true dangling reference and is now resolved.
+
+
 ## [0.53.3] — MCP tool-definition polish for the Glama listing
 
 Glama grades a listed server on **Tool Definition Quality (70%) + Server Coherence (30%)**, where the
