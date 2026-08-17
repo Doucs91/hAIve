@@ -6,6 +6,32 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.53.5] — Gate reports untracked files honestly
+
+`enforce finish` called every dirty path *"modified but not committed"*, including paths git reports
+as **untracked** (`??`). The two are not the same problem and do not have the same fix: a modified
+file must be committed, while an untracked one is committed **or** ignored. The wrong noun sent the
+developer hunting for a change that did not exist.
+
+- **`getGitSyncStatus` now separates `untrackedFiles` from `dirtyFiles`**, parsing the `??` marker off
+  the porcelain status line instead of collapsing every state into one list.
+- **The finding says what is actually true**, in three shapes: untracked-only → *"N file(s) are
+  untracked — neither committed nor ignored."*; mixed → *"N file(s) are uncommitted (M modified, U
+  untracked)."*; modified-only keeps the original wording. The shippable variant now says *"are not
+  committed"* rather than *"are modified"*, which was wrong for an untracked shippable file.
+- **The fix line offers the second exit** when the dirtiness is untracked-only: *"Commit them — or add
+  them to .gitignore if they are meant to stay local. Untracking a file without ignoring it leaves the
+  worktree permanently dirty."* That is the actual trap: a file untracked but never ignored blocks
+  this gate on **every later task**, and `hivelore init` itself leaves `.mcp.json`, `.cursor/mcp.json`
+  and `.vscode/` untracked — so a freshly initialised repo walks straight into it.
+
+Also: `docs/launch/` added to this repo's `.gitignore`, completing the intent of dd54870 (untracked as
+a local draft, but never ignored — which is what surfaced the misleading message in the first place).
+
+Verified against a throwaway git repo across all four states: shippable, untracked-only, mixed, and
+resolved-by-ignoring.
+
+
 ## [0.53.4] — Expose mem_update in the default MCP profile
 
 The default `enforcement` profile was **create-only** for memories: it shipped `mem_save` but no way

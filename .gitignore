@@ -50,3 +50,8 @@ ctx-haive-poc/
 
 # Machine-local tool-usage telemetry (never team truth)
 .ai/.usage/
+
+# Local launch drafts (Show HN / dev.to / Reddit copy) — kept local until published.
+# Untracked in dd54870 but never ignored, which left the worktree permanently dirty and
+# blocked `enforce finish` / `release ship`. In git, "keep this local" is an ignore rule.
+docs/launch/

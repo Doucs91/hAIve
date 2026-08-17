@@ -639,16 +639,28 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
   }
 
   const shippableDirty = status.dirtyFiles.filter(isShippablePath);
+  // Untracked files need a different sentence AND a different fix than modified ones: they are
+  // resolved by committing them *or* by ignoring them. Calling them "modified" sends the developer
+  // hunting for a change that does not exist — and a file left untracked-and-unignored keeps the
+  // worktree dirty forever, blocking this gate on every later task.
+  const modifiedCount = status.dirtyFiles.length - status.untrackedFiles.length;
+  const untrackedOnly = status.dirtyFiles.length > 0 && modifiedCount === 0;
   if (status.dirtyFiles.length > 0) {
     findings.push({
       severity: "error",
       code: shippableDirty.length > 0 ? "git-sync-uncommitted-shippable" : "git-sync-uncommitted-changes",
       message: shippableDirty.length > 0
-        ? `${shippableDirty.length} shippable file(s) are modified but not committed.`
-        : `${status.dirtyFiles.length} file(s) are modified but not committed.`,
+        ? `${shippableDirty.length} shippable file(s) are not committed.`
+        : untrackedOnly
+          ? `${status.untrackedFiles.length} file(s) are untracked — neither committed nor ignored.`
+          : status.untrackedFiles.length > 0
+            ? `${status.dirtyFiles.length} file(s) are uncommitted (${modifiedCount} modified, ${status.untrackedFiles.length} untracked).`
+            : `${status.dirtyFiles.length} file(s) are modified but not committed.`,
       fix: shippableDirty.length > 0
         ? "Bump the lockstep package version if needed, then `git add`, `git commit`, `git tag vX.Y.Z`, `git push && git push origin vX.Y.Z` (not `--tags`)."
-        : "Commit and push these changes before reporting the task done.",
+        : untrackedOnly
+          ? "Commit them — or add them to .gitignore if they are meant to stay local. Untracking a file without ignoring it leaves the worktree permanently dirty."
+          : "Commit and push these changes before reporting the task done.",
       reason: "The multi-agent git-sync decision requires agents to leave completed work committed and pushed, not as a local diff.",
       affected_files: status.dirtyFiles.slice(0, 12),
       impact: 100,
@@ -2297,6 +2309,13 @@ interface GitSyncStatus {
   ahead: number;
   behind: number;
   dirtyFiles: string[];
+  /**
+   * Subset of `dirtyFiles` that git reports as untracked (`??`). Kept apart because the corrective
+   * action differs: a modified file must be committed, while an untracked one is either committed
+   * OR ignored. Reporting the second as "modified" sent the developer looking for a change that
+   * does not exist.
+   */
+  untrackedFiles: string[];
   changedSinceUpstream: string[];
   releaseBaseRef?: string;
   releaseChangedFiles?: string[];
@@ -2311,16 +2330,34 @@ interface GithubActionsRun {
 }
 
 async function getGitSyncStatus(root: string): Promise<GitSyncStatus> {
-  const dirty = (await runCommand("git", ["status", "--short", "--untracked-files=all"], root).catch(() => ""))
+  const statusLines = (await runCommand("git", ["status", "--short", "--untracked-files=all"], root).catch(() => ""))
     .split("\n")
-    .map((line) => statusLineToPath(line.trim()))
-    .filter(Boolean)
-    .filter((file) => normalizeChangedFileList(file).length > 0);
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const dirty: string[] = [];
+  const untracked: string[] = [];
+  for (const line of statusLines) {
+    const file = statusLineToPath(line);
+    if (!file || normalizeChangedFileList(file).length === 0) continue;
+    dirty.push(file);
+    // `??` is git's untracked marker. Trimming above is safe for it (unlike the leading-space
+    // staged/unstaged distinction) because `?` is not whitespace.
+    if (line.startsWith("??")) untracked.push(file);
+  }
   const branch = (await runCommand("git", ["branch", "--show-current"], root).catch(() => "")).trim() || undefined;
   const upstream = (await runCommand("git", ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], root).catch(() => "")).trim() || undefined;
   if (!branch && !upstream) {
     const inside = (await runCommand("git", ["rev-parse", "--is-inside-work-tree"], root).catch(() => "")).trim();
-    if (inside !== "true") return { available: false, ahead: 0, behind: 0, dirtyFiles: [], changedSinceUpstream: [] };
+    if (inside !== "true") {
+      return {
+        available: false,
+        ahead: 0,
+        behind: 0,
+        dirtyFiles: [],
+        untrackedFiles: [],
+        changedSinceUpstream: [],
+      };
+    }
   }
 
   let ahead = 0;
@@ -2362,6 +2399,7 @@ async function getGitSyncStatus(root: string): Promise<GitSyncStatus> {
     ahead,
     behind,
     dirtyFiles: dirty,
+    untrackedFiles: untracked,
     changedSinceUpstream,
     ...(releaseBaseRef ? { releaseBaseRef } : {}),
     ...(releaseChangedFiles ? { releaseChangedFiles } : {}),
