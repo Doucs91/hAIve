@@ -45,6 +45,7 @@ import { registerRun } from "./commands/run.js";
 import { registerAgent } from "./commands/agent.js";
 import { registerSensors } from "./commands/sensors.js";
 import { registerIngest } from "./commands/ingest.js";
+import { registerReport } from "./commands/report.js";
 import { registerDashboard } from "./commands/dashboard.js";
 import { registerDevLink } from "./commands/dev-link.js";
 import { registerCoverage } from "./commands/coverage.js";
@@ -74,6 +75,7 @@ registerRun(program);
 registerAgent(program);
 registerSensors(program);
 registerIngest(program);
+registerReport(program);
 registerDashboard(program);
 registerCoverage(program);
 registerMergeDriver(program);
@@ -196,6 +198,7 @@ function applySurfaceVisibility(root: Command): void {
         "  reports:  dashboard · stats                    eval:     eval · benchmark · selftest (alias: bench)",
         "  index:    index code|memories|query            runtime:  observe (hook plumbing)",
         "  ops:      memory <sub> · sensors · ingest · sync · release · precommit (= enforce check)",
+        "  feedback: report list|submit|dismiss (friction agents hit with Hivelore itself)",
       ]
     : [];
   root.addHelpText(

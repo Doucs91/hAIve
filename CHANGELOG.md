@@ -6,6 +6,40 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.54.0] — Friction journal — agents report Hivelore's own bugs, humans publish them
+
+Agents hit friction with Hivelore itself and had nowhere to put it, so it evaporated at the end of
+every session. The obvious fix — let the agent open a GitHub issue — is the one to avoid: curl
+scrapped its bug bounty in January 2026 after unreviewed AI submissions became, in the maintainers'
+words, a *"DDoS-like situation"* (~5% genuine). It would also break
+`2026-06-02-decision-tools-must-be-environment-independent` (a token in every user's environment) and
+hand every agent a write path to a public tracker from inside a customer's repo.
+
+So: **capture at zero friction, publish at high friction.**
+
+- **`report_friction` MCP tool** (in the DEFAULT `enforcement` profile — 14 → 15 tools; an agent only
+  reports in the session where it hit the problem and will not switch profiles to do so). Appends to
+  a machine-local journal at `.ai/.runtime/friction.jsonl`. **No network, ever.**
+- **Evidence bar.** `kind: "bug"` requires a runnable `repro`; without one the report is kept but
+  filed as `suggestion`, and the agent is told why. This is the sensor layer's own doctrine — an
+  oracle that never went RED cannot claim protection — turned on Hivelore's feedback channel.
+- **Deduplication is the prioritisation.** Reports are fingerprinted on kind + surface + a normalised
+  summary (case, whitespace, absolute paths and long digit runs collapsed), so a rephrased repeat
+  raises the count instead of forking a new entry. The tool returns `already_reported` and the
+  occurrence count, which tells the agent to stop and gives the maintainer a free ranking.
+- **`hivelore report list | submit | dismiss`** (advanced surface) is the human gate. `submit` prints
+  a **preview** and requires `--yes` to create anything, warns against publishing secrets or customer
+  code, and falls back to a prefilled URL when `gh` is absent rather than adding a hard dependency.
+- **`doctor`** surfaces `friction-unreviewed` (always `info` — feedback about the tooling is never a
+  defect in the user's repo), otherwise a write-only journal nobody reads.
+- **`report_friction` is deliberately not in `MUTATING_TOOLS`**, i.e. not gated behind "a briefing was
+  loaded". The friction being reported may be that the briefing failed; gating the feedback channel
+  behind the thing that might be broken would silence exactly the reports worth having.
+
+8 new core tests; verified end-to-end over stdio in a throwaway repo (evidence bar, dedup, list,
+preview-only submit, dismiss, doctor surfacing, and absence from `git status`).
+
+
 ## [0.53.5] — Gate reports untracked files honestly
 
 `enforce finish` called every dirty path *"modified but not committed"*, including paths git reports

@@ -77,6 +77,11 @@ import {
   type ScaffoldTestInput,
 } from "./tools/scaffold-test.js";
 import {
+  ReportFrictionInputSchema,
+  reportFriction,
+  type ReportFrictionInput,
+} from "./tools/report-friction.js";
+import {
   IngestFindingsInputSchema,
   ingestFindings,
   type IngestFindingsInput,
@@ -227,6 +232,7 @@ export {
   type AstScanResult,
 } from "./ast-sensors.js";
 export { memTried, type MemTriedOutput } from "./tools/mem-tried.js";
+export { reportFriction, type ReportFrictionOutput } from "./tools/report-friction.js";
 export { proposeSensor, type ProposeSensorOutput } from "./tools/propose-sensor.js";
 export {
   scaffoldTest,
@@ -289,6 +295,9 @@ export const ENFORCEMENT_PROFILE_TOOLS = [
   "mem_session_end",
   "propose_sensor",
   "scaffold_test",
+  // Must live in the DEFAULT profile or it is never used: an agent only reports friction in the
+  // session where it hit the friction, and it will not switch profiles to do so.
+  "report_friction",
 ] as const;
 
 export const MAINTENANCE_PROFILE_TOOLS = [
@@ -334,6 +343,10 @@ export function getAllowedToolsForProfile(profile: ToolProfile): ReadonlySet<str
 
 const BRIEFING_TOOLS = new Set(["get_briefing", "mem_relevant_to"]);
 
+// Tools gated behind "a briefing must have been loaded first". `report_friction` is deliberately
+// NOT here: it writes only to the machine-local friction journal, never to the corpus, and the
+// friction being reported may well BE that the briefing failed — gating the feedback channel behind
+// the thing that might be broken would silence exactly the reports worth having.
 const MUTATING_TOOLS = new Set([
   "mem_save",
   "mem_tried",
@@ -567,6 +580,49 @@ export function createHaiveServer(
     async (input: ScaffoldTestInput) => {
       tracker.record("scaffold_test", input.memory_id);
       return jsonResult(await scaffoldTest(input, context));
+    },
+  );
+
+  registerTool(
+    "report_friction",
+    [
+      "Tell Hivelore's maintainer that HIVELORE ITSELF got in your way — a bug in a Hivelore tool, a",
+      "misleading message, wrong docs, or an improvement idea.",
+      "",
+      "USE THIS WHEN the friction is with Hivelore, not with the project you are working on:",
+      "  - a Hivelore tool or command errored, or did something other than what it documented",
+      "  - a message or return value misled you into a wrong action",
+      "  - the docs/description for a tool were wrong, missing, or contradictory",
+      "  - you can see a concrete improvement to how a Hivelore tool behaves",
+      "",
+      "DO NOT USE for anything about the project's own code → that is mem_tried (a failed approach)",
+      "or mem_save (a gotcha/convention). This tool is only for feedback ON THE TOOLING.",
+      "",
+      "STAYS LOCAL. Nothing is published: the report is appended to a machine-local journal under",
+      ".ai/.runtime/ and a human reviews it with `hivelore report list` before anything reaches a",
+      "public tracker. Never put secrets or customer code in a report.",
+      "",
+      "EVIDENCE BAR: kind='bug' REQUIRES a runnable `repro`. Without one the report is still kept,",
+      "but filed as 'suggestion' — an unreproducible bug claim cannot be acted on.",
+      "",
+      "DEDUPLICATED: reports are fingerprinted on kind+surface+summary. If you get back",
+      "already_reported=true, the point is already made — do not rephrase and send it again. The",
+      "occurrence count is what ranks it for the maintainer.",
+      "",
+      "PARAMETERS:",
+      "  kind     — bug | suggestion | docs | confusing",
+      "  surface  — the Hivelore tool or command involved (e.g. 'mem_save', 'enforce check')",
+      "  summary  — one specific line stating the problem (this is the dedup key)",
+      "  expected — what you expected Hivelore to do",
+      "  observed — what it actually did (exact message or output)",
+      "  repro    — a command/tool call that reproduces it, runnable as-is (required for 'bug')",
+      "",
+      "RETURNS: { ok, kind, fingerprint, occurrences, already_reported, notice? }",
+    ].join("\n"),
+    ReportFrictionInputSchema,
+    async (input: ReportFrictionInput) => {
+      tracker.record("report_friction", input.surface);
+      return jsonResult(await reportFriction(input, context));
     },
   );
 

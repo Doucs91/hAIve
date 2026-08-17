@@ -32,6 +32,9 @@ import {
   loadSensorLedger,
   loadUsageIndex,
   readUsageEvents,
+  readFrictionReports,
+  loadFrictionState,
+  groupFriction,
   resolveHaivePaths,
   type LoadedMemory,
   type SensorTarget,
@@ -519,6 +522,32 @@ export function registerDoctor(program: Command): void {
             fix: "hivelore index code   # if files are untracked, commit them or check nested-repo setup",
           });
         }
+      }
+
+      // ── Friction agents hit with Hivelore itself ──
+      // The journal is write-only from the agent's side, so without a nudge here nobody ever reads
+      // it. Always `info`: this is feedback about the tooling, never a defect in the user's repo.
+      try {
+        const openFriction = groupFriction(
+          await readFrictionReports(paths),
+          await loadFrictionState(paths),
+        ).filter((group) => group.status === "open");
+        if (openFriction.length > 0) {
+          const occurrences = openFriction.reduce((sum, group) => sum + group.count, 0);
+          const top = openFriction[0]!;
+          findings.push({
+            severity: "info",
+            code: "friction-unreviewed",
+            section: "Corpus health" as DoctorSection,
+            message:
+              `${openFriction.length} unreviewed friction report${openFriction.length === 1 ? "" : "s"} ` +
+              `from agent sessions (${occurrences} occurrence${occurrences === 1 ? "" : "s"}). ` +
+              `Top: ${top.surface} — ${top.summary} (${top.count}×).`,
+            fix: "hivelore report list",
+          });
+        }
+      } catch {
+        // The journal is best-effort telemetry; never fail doctor over it.
       }
 
       findings.push(...await collectHarnessCoverageFindings(codeMap, memories));
