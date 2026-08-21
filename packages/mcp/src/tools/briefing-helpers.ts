@@ -6,9 +6,13 @@ import {
   isGlobPath,
   pathsOverlap,
   priorityRank as corePriorityRank,
+  anchorSpecificity,
+  churnForAnchors,
+  DEFAULT_SPECIFICITY,
 } from "@hivelore/core";
 import type { LoadedMemory } from "@hivelore/core";
 import { runSemantic } from "../embeddings-runtime.js";
+import type { ChurnSample } from "../anchor-churn.js";
 import type { HaiveContext } from "../context.js";
 import type {
   BriefingMemory,
@@ -34,12 +38,21 @@ export function classifyMemoryPriority(
   loaded: LoadedMemory | undefined,
   inputFiles: string[],
   inputSymbols: string[],
+  churn?: ChurnSample | null,
 ): BriefingMemoryPriority {
   const fm = loaded?.memory.frontmatter;
-  const directAnchor = Boolean(
-    fm && inputFiles.length > 0 &&
-    fm.anchor.paths.some((p) => inputFiles.some((file) => pathsOverlap(p, file))),
-  );
+  const matchedAnchors = fm && inputFiles.length > 0
+    ? fm.anchor.paths.filter((p) => inputFiles.some((file) => pathsOverlap(p, file)))
+    : [];
+  const directAnchor = matchedAnchors.length > 0;
+  // How discriminating was the anchor that matched? Unknown churn → 1 (rank exactly as before).
+  const specificity = churn
+    ? anchorSpecificity(
+        matchedAnchors,
+        churnForAnchors(matchedAnchors, new Map(Object.entries(churn.files))),
+        churn.total_commits,
+      )
+    : DEFAULT_SPECIFICITY;
   const directSymbol = Boolean(
     fm && inputSymbols.length > 0 &&
     fm.anchor.symbols.some((sym) =>
@@ -59,6 +72,7 @@ export function classifyMemoryPriority(
     usefulSemantic: semantic >= 0.35,
     moduleOrDomainMatch: memory.reasons.includes("module") || memory.reasons.includes("domain"),
     tagTaskMatch: false, // MCP ranking doesn't use a separate tag-token signal
+    anchorSpecificity: specificity,
   });
 }
 
@@ -179,6 +193,29 @@ export function explainWhySurfaced(
     why.push("Unvalidated record; use cautiously or ask a human before treating it as policy.");
   }
   return why;
+}
+
+/**
+ * Specificity of the anchor a memory matched on, for WITHIN-TIER ordering.
+ *
+ * The tier already answers "may this crowd the top rank?". This answers the next question the tier
+ * cannot: among several memories that legitimately matched, which anchor actually discriminates?
+ * Without it, memories anchored to the same high-churn file tie and the winner is arbitrary.
+ */
+export function matchedAnchorSpecificity(
+  loaded: LoadedMemory | undefined,
+  inputFiles: string[],
+  churn?: ChurnSample | null,
+): number {
+  const fm = loaded?.memory.frontmatter;
+  if (!churn || !fm || inputFiles.length === 0) return DEFAULT_SPECIFICITY;
+  const matched = fm.anchor.paths.filter((p) => inputFiles.some((file) => pathsOverlap(p, file)));
+  if (matched.length === 0) return DEFAULT_SPECIFICITY;
+  return anchorSpecificity(
+    matched,
+    churnForAnchors(matched, new Map(Object.entries(churn.files))),
+    churn.total_commits,
+  );
 }
 
 /**

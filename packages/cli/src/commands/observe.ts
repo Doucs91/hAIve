@@ -115,11 +115,36 @@ export function isExpectedNonzeroExit(command: string): boolean {
  * Best-effort — false negatives are acceptable; false positives create noise (and noise that gets
  * ignored is worse than silence), so bare non-zero exits from grep/pipes/etc. are NOT flagged.
  */
+/**
+ * Did the command report SUCCESS? A tool that exited 0 did not fail, whatever words are in its
+ * output — and that is the whole fix for the defect below.
+ */
+function exitedCleanly(payload: HookPayload): boolean {
+  const response = payload.tool_response;
+  if (typeof response !== "object" || response === null) return false;
+  const code = (response as Record<string, unknown>)["exit_code"] ??
+               (response as Record<string, unknown>)["exitCode"];
+  return code === 0;
+}
+
 export function detectFailure(payload: HookPayload): boolean {
   const response = payload.tool_response;
   if (!response) return false;
 
   const responseText = typeof response === "string" ? response : JSON.stringify(response);
+
+  // A command that exited 0 SUCCEEDED. Its output may still contain the words the signatures below
+  // look for — because it printed source code, a log, a regex, or this very function.
+  //
+  // Measured on 256 real observations from this repo: every one of the 3 `failure_hint` flags was a
+  // false positive, and the third fired while investigating the second — `grep -A22 "function
+  // detectFailure" observe.ts` was marked as a failure because its output is the list of strings
+  // this function matches on. Reading the detector triggered the detector.
+  //
+  // Exit codes stay authoritative (guarded by `isExpectedNonzeroExit`); text signatures are now
+  // only a fallback for when the harness reports no code at all. False negatives are acceptable
+  // here and false positives are not: noise that gets ignored is worse than silence.
+  if (exitedCleanly(payload)) return false;
 
   // Bash: a non-zero exit is a failure signal ONLY when the command isn't one that routinely
   // exits non-zero (grep no-match, a pipeline's last stage, etc.). Real build/test/runtime errors

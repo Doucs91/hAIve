@@ -1,5 +1,5 @@
 {
-  "saved_at": "2026-07-05T16:32:43.007Z",
+  "saved_at": "2026-08-21T19:55:07.241Z",
   "k": 8,
   "spec_source": ".ai/eval/spec.json + synthesized anchored retrieval",
   "report": {
@@ -35,10 +35,10 @@
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir",
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
-            "2026-07-05-convention-child-process-no-shell-interpolation",
-            "2026-06-06-decision-search-perf-and-index-staleness",
-            "2026-05-02-gotcha-getbriefing-semantic-hits-silently-dropped-byid"
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist",
+            "2026-06-06-decision-search-perf-and-index-staleness"
           ],
           "hits": [
             "2026-04-25-architecture-pure-tool-handlers"
@@ -56,17 +56,18 @@
           "surfaced_ids": [
             "2026-04-25-convention-always-run-tests-before-commit",
             "2026-07-03-attempt-relied-on-pnpm-r-build",
-            "2026-07-05-convention-root-verify-is-release-chain",
-            "2026-04-25-convention-use-pnpm-workspaces",
+            "2026-07-06-gotcha-github-action-bundle-must-be-tracked",
+            "2026-07-05-convention-ci-enforces-eval-regressions",
             "2026-06-02-decision-atomic-release-commit-and-skip-ci-tip",
             "2026-06-02-gotcha-commit-message-body-skip-ci-skips-whole-push",
-            "2026-07-05-convention-ci-enforces-eval-regressions"
+            "2026-07-05-convention-root-verify-is-release-chain",
+            "2026-04-25-convention-use-pnpm-workspaces"
           ],
           "hits": [
             "2026-04-25-convention-always-run-tests-before-commit"
           ],
           "misses": [],
-          "precision": 0.143,
+          "precision": 0.125,
           "recall": 1,
           "best_rank": 1
         },
@@ -94,13 +95,14 @@
             "2026-04-25-decision-esm-only"
           ],
           "surfaced_ids": [
-            "2026-04-25-decision-esm-only"
+            "2026-04-25-decision-esm-only",
+            "2026-07-07-decision-excellence-polish-pass-v0530"
           ],
           "hits": [
             "2026-04-25-decision-esm-only"
           ],
           "misses": [],
-          "precision": 1,
+          "precision": 0.5,
           "recall": 1,
           "best_rank": 1
         },
@@ -111,13 +113,13 @@
           ],
           "surfaced_ids": [
             "2026-04-25-gotcha-tsup-externals-required",
+            "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli",
             "2026-06-08-architecture-code-map-ast-web-tree-sitter-vendored-grammars",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
             "2026-04-27-gotcha-embeddings-load-error-double-print",
             "2026-04-27-gotcha-mcp-exports-package-json",
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
-            "2026-07-05-convention-hivelore-mcp-package-export",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-07-05-convention-hivelore-mcp-package-export"
           ],
           "hits": [
             "2026-04-25-gotcha-tsup-externals-required"
@@ -135,8 +137,8 @@
           "surfaced_ids": [
             "2026-04-27-decision-zod-error-formatting-no-direct-import",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-06-02-architecture-cli-command-surface",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
+            "2026-06-02-architecture-cli-command-surface",
             "2026-04-27-gotcha-version-define-tsup-and-vitest",
             "2026-04-28-architecture-adding-new-mcp-tool",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
@@ -181,11 +183,11 @@
             "2026-04-27-gotcha-mcp-exports-package-json",
             "2026-07-05-convention-hivelore-mcp-package-export",
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-07-05-convention-hivelore-workspace-dependencies",
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
             "2026-06-02-architecture-cli-command-surface",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-04-27-gotcha-embeddings-load-error-double-print"
+            "2026-04-27-gotcha-embeddings-load-error-double-print",
+            "2026-07-05-convention-hivelore-workspace-dependencies",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job"
           ],
           "hits": [
             "2026-04-27-gotcha-mcp-exports-package-json"
@@ -202,13 +204,13 @@
           ],
           "surfaced_ids": [
             "2026-04-27-gotcha-version-define-tsup-and-vitest",
-            "2026-06-02-architecture-cli-command-surface",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-06-02-architecture-cli-command-surface",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-06-02-architecture-mcp-tool-contract",
             "2026-04-28-architecture-adding-new-mcp-tool",
-            "2026-04-27-decision-zod-error-formatting-no-direct-import",
-            "2026-07-03-attempt-duplicating-json-on-a-commander"
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
+            "2026-04-27-decision-zod-error-formatting-no-direct-import"
           ],
           "hits": [
             "2026-04-27-gotcha-version-define-tsup-and-vitest"
@@ -226,12 +228,12 @@
           "surfaced_ids": [
             "2026-04-28-architecture-adding-new-mcp-tool",
             "2026-06-02-architecture-mcp-tool-contract",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-06-02-architecture-cli-command-surface",
             "2026-04-27-decision-zod-error-formatting-no-direct-import",
-            "2026-04-27-gotcha-version-define-tsup-and-vitest",
-            "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing"
+            "2026-04-27-gotcha-version-define-tsup-and-vitest"
           ],
           "hits": [
             "2026-04-28-architecture-adding-new-mcp-tool"
@@ -267,11 +269,11 @@
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-04-25-architecture-pure-tool-handlers",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-07-05-convention-child-process-no-shell-interpolation",
-            "2026-04-27-gotcha-mcp-exports-package-json",
-            "2026-07-05-convention-hivelore-mcp-package-export"
+            "2026-04-27-gotcha-mcp-exports-package-json"
           ],
           "hits": [
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing"
@@ -308,13 +310,13 @@
           ],
           "surfaced_ids": [
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
-            "2026-07-05-convention-hivelore-workspace-dependencies",
-            "2026-04-27-gotcha-mcp-exports-package-json",
-            "2026-07-05-convention-hivelore-mcp-package-export",
-            "2026-07-02-decision-hivelore-rename-compat-strategy",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-06-02-architecture-cli-command-surface"
+            "2026-06-02-architecture-cli-command-surface",
+            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
+            "2026-04-27-decision-zod-error-formatting-no-direct-import",
+            "2026-06-06-decision-code-search-hybrid-ranking",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-06-02-architecture-mcp-tool-contract"
           ],
           "hits": [
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges"
@@ -337,7 +339,7 @@
             "2026-05-04-gotcha-auto-promote-ignores-config-minreads",
             "2026-06-06-decision-harness-quality-batch-v0270",
             "2026-06-07-decision-first-agent-bootstrap-gate",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete"
           ],
           "hits": [
             "2026-05-02-gotcha-getbriefing-semantic-hits-silently-dropped-byid"
@@ -355,16 +357,18 @@
           "surfaced_ids": [
             "2026-05-04-decision-v091-bugfixes-overview",
             "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-08-21-decision-process-gates-advisory-only-sensors-refuse",
             "2026-06-04-decision-precommit-autobrief-and-briefing-json",
             "2026-07-02-decision-process-gates-bind-agents-not-humans",
             "2026-05-04-gotcha-auto-promote-ignores-config-minreads",
-            "2026-04-28-gotcha-serializememory-undefined-values-crash"
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-07-decision-kill-haive-rename-migration"
           ],
           "hits": [
             "2026-05-04-decision-v091-bugfixes-overview"
           ],
           "misses": [],
-          "precision": 0.167,
+          "precision": 0.125,
           "recall": 1,
           "best_rank": 1
         },
@@ -377,10 +381,10 @@
             "2026-05-04-gotcha-auto-promote-ignores-config-minreads",
             "2026-05-04-decision-v091-bugfixes-overview",
             "2026-06-04-decision-precommit-autobrief-and-briefing-json",
-            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-04-25-architecture-pure-tool-handlers",
-            "2026-06-07-decision-first-agent-bootstrap-gate",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
             "2026-07-02-decision-process-gates-bind-agents-not-humans"
           ],
           "hits": [
@@ -399,8 +403,8 @@
           "surfaced_ids": [
             "2026-05-28-decision-codemap-tracked-files-by-default",
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
-            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-06-08-architecture-code-map-ast-web-tree-sitter-vendored-grammars",
+            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-04-28-gotcha-serializememory-undefined-values-crash"
           ],
           "hits": [
@@ -418,13 +422,13 @@
           ],
           "surfaced_ids": [
             "2026-05-28-decision-ship-embeddings-with-cli-mcp",
-            "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
             "2026-06-02-architecture-cli-command-surface",
-            "2026-07-05-convention-hivelore-mcp-package-export",
-            "2026-04-27-gotcha-mcp-exports-package-json",
-            "2026-07-05-convention-hivelore-workspace-dependencies",
-            "2026-07-02-decision-hivelore-rename-compat-strategy",
-            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos"
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
+            "2026-07-06-decision-behaviour-coverage-loop-to-action",
+            "2026-07-06-decision-behaviour-coverage-metric"
           ],
           "hits": [
             "2026-05-28-decision-ship-embeddings-with-cli-mcp"
@@ -443,11 +447,11 @@
             "2026-05-29-attempt-asserting-warninglevel-info-pour-un",
             "2026-06-02-architecture-core-pure-domain-layer",
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-07-05-convention-child-process-no-shell-interpolation",
-            "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-04-25-architecture-pure-tool-handlers",
-            "2026-06-02-architecture-mcp-tool-contract"
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-06-02-convention-tool-ui-english-user-content-any-language"
           ],
           "hits": [
             "2026-05-29-attempt-asserting-warninglevel-info-pour-un"
@@ -485,10 +489,10 @@
             "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
             "2026-07-02-decision-sensor-only-hard-block-determinism",
             "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-06-07-decision-first-agent-bootstrap-gate",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-06-02-decision-ci-decision-coverage-local-marker",
-            "2026-06-04-decision-precommit-autobrief-and-briefing-json"
+            "2026-06-07-decision-first-agent-bootstrap-gate",
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390"
           ],
           "hits": [],
           "misses": [
@@ -508,10 +512,10 @@
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-04-28-architecture-adding-new-mcp-tool",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-04-27-decision-zod-error-formatting-no-direct-import",
             "2026-04-27-gotcha-embeddings-load-error-double-print",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant"
+            "2026-04-27-decision-zod-error-formatting-no-direct-import",
+            "2026-06-02-decision-tools-must-be-environment-independent",
+            "2026-07-02-decision-hivelore-rename-compat-strategy"
           ],
           "hits": [
             "2026-06-02-architecture-cli-command-surface"
@@ -530,11 +534,11 @@
             "2026-06-02-architecture-core-pure-domain-layer",
             "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir",
             "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
+            "2026-07-06-decision-behaviour-coverage-metric",
             "2026-05-29-attempt-asserting-warninglevel-info-pour-un",
             "2026-06-07-decision-first-agent-bootstrap-gate",
-            "2026-07-03-attempt-typechecking-cli-immediately-after-adding",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos"
+            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant"
           ],
           "hits": [
             "2026-06-02-architecture-core-pure-domain-layer"
@@ -553,11 +557,11 @@
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-04-25-architecture-pure-tool-handlers",
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-07-05-convention-child-process-no-shell-interpolation",
-            "2026-04-28-architecture-adding-new-mcp-tool",
-            "2026-05-02-gotcha-getbriefing-semantic-hits-silently-dropped-byid"
+            "2026-06-08-decision-validated-by-provenance-human-agent-auto"
           ],
           "hits": [
             "2026-06-02-architecture-mcp-tool-contract"
@@ -575,12 +579,12 @@
           "surfaced_ids": [
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-06-07-convention-vscode-cli-calls-through-runhaive",
-            "2026-06-02-architecture-mcp-tool-contract",
             "2026-04-28-architecture-adding-new-mcp-tool",
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-04-27-decision-zod-error-formatting-no-direct-import",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-04-27-gotcha-version-define-tsup-and-vitest"
+            "2026-06-02-architecture-cli-command-surface"
           ],
           "hits": [
             "2026-06-02-convention-tool-ui-english-user-content-any-language"
@@ -598,12 +602,12 @@
           "surfaced_ids": [
             "2026-06-02-convention-verify-pipelines-before-closing",
             "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-06-decision-de-ceremony-pass",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-06-02-architecture-cli-command-surface",
             "2026-06-02-architecture-mcp-tool-contract",
-            "2026-06-07-decision-first-agent-bootstrap-gate",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390"
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos"
           ],
           "hits": [
             "2026-06-02-convention-verify-pipelines-before-closing"
@@ -642,11 +646,11 @@
             "2026-06-02-decision-ci-decision-coverage-local-marker",
             "2026-06-04-decision-precommit-autobrief-and-briefing-json",
             "2026-06-04-decision-stack-pack-dedup-by-signature-and-coverage-self-exempt",
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-07-02-decision-process-gates-bind-agents-not-humans",
             "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-07-03-decision-gate-passes-as-synthetic-ledger-row"
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant"
           ],
           "hits": [
             "2026-06-02-decision-ci-decision-coverage-local-marker"
@@ -664,12 +668,12 @@
           "surfaced_ids": [
             "2026-06-02-decision-tools-must-be-environment-independent",
             "2026-06-02-convention-verify-pipelines-before-closing",
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish",
             "2026-06-02-architecture-cli-command-surface",
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
-            "2026-07-03-decision-init-bridges-detected-clients-default",
+            "2026-07-06-decision-de-ceremony-pass",
             "2026-07-05-decision-pr-loop-review-learnings-phase3",
-            "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-06-02-convention-tool-ui-english-user-content-any-language"
+            "2026-07-03-decision-init-bridges-detected-clients-default"
           ],
           "hits": [
             "2026-06-02-decision-tools-must-be-environment-independent"
@@ -722,13 +726,13 @@
           ],
           "surfaced_ids": [
             "2026-07-03-decision-init-bridges-detected-clients-default",
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish",
             "2026-06-02-decision-tools-must-be-environment-independent",
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
+            "2026-07-06-decision-de-ceremony-pass",
             "2026-06-02-architecture-cli-command-surface",
             "2026-06-02-convention-verify-pipelines-before-closing",
-            "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-06-07-convention-vscode-cli-calls-through-runhaive"
+            "2026-06-02-architecture-core-pure-domain-layer"
           ],
           "hits": [],
           "misses": [
@@ -747,11 +751,11 @@
             "2026-06-03-gotcha-antipattern-self-match-on-memory-file-edit",
             "2026-06-08-decision-semantic-gate-false-positive-reduction-sensorless-review-tes",
             "2026-07-02-decision-sensor-only-hard-block-determinism",
+            "2026-07-06-gotcha-gate-large-diff-robustness",
             "2026-04-25-architecture-pure-tool-handlers",
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-04-27-gotcha-mcp-exports-package-json"
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete"
           ],
           "hits": [
             "2026-06-03-gotcha-antipattern-self-match-on-memory-file-edit"
@@ -768,13 +772,13 @@
           ],
           "surfaced_ids": [
             "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-07-02-decision-process-gates-bind-agents-not-humans",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-06-07-decision-first-agent-bootstrap-gate",
-            "2026-06-09-gotcha-sensors-check-self-match-on-ai-files",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
-            "2026-06-02-architecture-cli-command-surface"
+            "2026-07-06-gotcha-gate-large-diff-robustness",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-06-07-decision-first-agent-bootstrap-gate",
+            "2026-06-09-gotcha-sensors-check-self-match-on-ai-files"
           ],
           "hits": [
             "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate"
@@ -791,13 +795,13 @@
           ],
           "surfaced_ids": [
             "2026-06-04-decision-precommit-autobrief-and-briefing-json",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
             "2026-05-04-gotcha-auto-promote-ignores-config-minreads",
-            "2026-06-02-decision-ci-decision-coverage-local-marker",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-06-05-convention-briefing-breadcrumbs-are-pointers-not-copies",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-06-04-decision-stack-pack-dedup-by-signature-and-coverage-self-exempt",
-            "2026-07-02-decision-process-gates-bind-agents-not-humans"
+            "2026-07-02-decision-process-gates-bind-agents-not-humans",
+            "2026-05-04-decision-v091-bugfixes-overview",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-06-decision-de-ceremony-pass"
           ],
           "hits": [
             "2026-06-04-decision-precommit-autobrief-and-briefing-json"
@@ -815,12 +819,12 @@
           "surfaced_ids": [
             "2026-06-04-decision-stack-pack-dedup-by-signature-and-coverage-self-exempt",
             "2026-06-04-decision-precommit-autobrief-and-briefing-json",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-07-03-attempt-running-hivelore-release-tag-right",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-07-02-decision-process-gates-bind-agents-not-humans",
             "2026-06-02-architecture-cli-command-surface",
-            "2026-06-02-decision-ci-decision-coverage-local-marker"
+            "2026-07-02-decision-process-gates-bind-agents-not-humans"
           ],
           "hits": [
             "2026-06-04-decision-stack-pack-dedup-by-signature-and-coverage-self-exempt"
@@ -837,13 +841,13 @@
           ],
           "surfaced_ids": [
             "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-07-04-decision-prove-red-and-env-scrub-phase4",
             "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
-            "2026-07-04-decision-prove-red-and-env-scrub-phase4"
+            "2026-07-07-decision-excellence-polish-pass-v0530"
           ],
           "hits": [
             "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate"
@@ -880,10 +884,10 @@
             "2026-06-05-attempt-running-pnpm-r-build-and",
             "2026-04-27-gotcha-embeddings-load-error-double-print",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
-            "2026-06-06-decision-search-perf-and-index-staleness",
             "2026-04-28-gotcha-serializememory-undefined-values-crash",
+            "2026-06-06-decision-search-perf-and-index-staleness",
             "2026-06-06-decision-code-search-hybrid-ranking",
+            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
             "2026-04-25-architecture-embedderlike-interface"
           ],
           "hits": [
@@ -901,10 +905,10 @@
           ],
           "surfaced_ids": [
             "2026-06-05-convention-briefing-breadcrumbs-are-pointers-not-copies",
-            "2026-06-02-architecture-cli-command-surface",
             "2026-06-02-architecture-mcp-tool-contract",
-            "2026-04-25-architecture-pure-tool-handlers",
             "2026-06-06-decision-harness-quality-batch-v0270",
+            "2026-04-25-architecture-pure-tool-handlers",
+            "2026-06-02-architecture-cli-command-surface",
             "2026-05-02-gotcha-getbriefing-semantic-hits-silently-dropped-byid",
             "2026-06-04-decision-precommit-autobrief-and-briefing-json",
             "2026-06-07-decision-first-agent-bootstrap-gate"
@@ -945,12 +949,12 @@
           "surfaced_ids": [
             "2026-06-06-decision-harness-quality-batch-v0270",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
             "2026-06-07-gotcha-autogen-sensor-inverted-when-companion-longer-than-call",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-06-02-architecture-cli-command-surface",
             "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-07-05-decision-eval-golden-set-tier-contract-phase5",
-            "2026-07-04-decision-prove-red-and-env-scrub-phase4"
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard"
           ],
           "hits": [
             "2026-06-06-decision-harness-quality-batch-v0270"
@@ -991,12 +995,12 @@
           "surfaced_ids": [
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-06-02-architecture-cli-command-surface",
             "2026-05-28-decision-codemap-tracked-files-by-default",
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
-            "2026-07-03-decision-init-bridges-detected-clients-default",
-            "2026-06-02-decision-tools-must-be-environment-independent",
-            "2026-06-08-architecture-code-map-ast-web-tree-sitter-vendored-grammars"
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish",
+            "2026-06-02-architecture-cli-command-surface",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-07-03-decision-init-bridges-detected-clients-default"
           ],
           "hits": [
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos"
@@ -1030,13 +1034,13 @@
           ],
           "surfaced_ids": [
             "2026-06-07-decision-first-agent-bootstrap-gate",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
             "2026-06-02-architecture-mcp-tool-contract",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
-            "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-07-02-decision-process-gates-bind-agents-not-humans",
-            "2026-07-02-decision-command-sensors-behaviour-bridge"
+            "2026-07-06-decision-de-ceremony-pass"
           ],
           "hits": [
             "2026-06-07-decision-first-agent-bootstrap-gate"
@@ -1053,8 +1057,10 @@
           ],
           "surfaced_ids": [
             "2026-06-07-gotcha-autogen-sensor-inverted-when-companion-longer-than-call",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-06-08-decision-sensors-seed-not-autogen-propose-sensor-sole-writer",
             "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-06-06-decision-harness-quality-batch-v0270",
             "2026-04-28-gotcha-serializememory-undefined-values-crash"
           ],
@@ -1062,7 +1068,7 @@
             "2026-06-07-gotcha-autogen-sensor-inverted-when-companion-longer-than-call"
           ],
           "misses": [],
-          "precision": 0.2,
+          "precision": 0.143,
           "recall": 1,
           "best_rank": 1
         },
@@ -1096,10 +1102,10 @@
             "2026-07-02-decision-sensor-only-hard-block-determinism",
             "2026-06-03-gotcha-antipattern-self-match-on-memory-file-edit",
             "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
+            "2026-07-06-gotcha-gate-large-diff-robustness",
             "2026-04-25-architecture-pure-tool-handlers",
             "2026-06-02-architecture-mcp-tool-contract",
-            "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate"
           ],
           "hits": [
             "2026-06-08-decision-semantic-gate-false-positive-reduction-sensorless-review-tes"
@@ -1116,13 +1122,13 @@
           ],
           "surfaced_ids": [
             "2026-06-08-decision-sensors-seed-not-autogen-propose-sensor-sole-writer",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-06-07-gotcha-autogen-sensor-inverted-when-companion-longer-than-call",
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-06-06-decision-harness-quality-batch-v0270",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-04-25-architecture-pure-tool-handlers",
-            "2026-06-02-architecture-mcp-tool-contract"
+            "2026-04-25-architecture-pure-tool-handlers"
           ],
           "hits": [
             "2026-06-08-decision-sensors-seed-not-autogen-propose-sensor-sole-writer"
@@ -1139,13 +1145,13 @@
           ],
           "surfaced_ids": [
             "2026-06-08-decision-validated-by-provenance-human-agent-auto",
-            "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-03-decision-sensor-incident-provenance-on-frontmatter",
+            "2026-06-02-architecture-mcp-tool-contract",
             "2026-04-25-architecture-pure-tool-handlers",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
+            "2026-06-02-architecture-cli-command-surface"
           ],
           "hits": [
             "2026-06-08-decision-validated-by-provenance-human-agent-auto"
@@ -1164,11 +1170,11 @@
             "2026-06-09-gotcha-sensors-check-self-match-on-ai-files",
             "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
             "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-07-06-gotcha-gate-large-diff-robustness",
+            "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
+            "2026-06-02-architecture-core-pure-domain-layer"
           ],
           "hits": [
             "2026-06-09-gotcha-sensors-check-self-match-on-ai-files"
@@ -1185,13 +1191,13 @@
           ],
           "surfaced_ids": [
             "2026-07-02-decision-command-sensors-behaviour-bridge",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
             "2026-07-04-gotcha-pending-oracle-fake-protection",
-            "2026-07-02-decision-hivelore-rename-compat-strategy",
-            "2026-06-09-gotcha-sensors-check-self-match-on-ai-files",
-            "2026-07-03-attempt-running-hivelore-release-tag-right"
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-07-05-convention-child-process-no-shell-interpolation",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant"
           ],
           "hits": [
             "2026-07-02-decision-command-sensors-behaviour-bridge"
@@ -1208,13 +1214,13 @@
           ],
           "surfaced_ids": [
             "2026-07-02-decision-hivelore-rename-compat-strategy",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
             "2026-07-02-decision-command-sensors-behaviour-bridge",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
             "2026-06-09-gotcha-sensors-check-self-match-on-ai-files",
-            "2026-06-04-decision-precommit-autobrief-and-briefing-json",
-            "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant"
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-06-04-decision-precommit-autobrief-and-briefing-json"
           ],
           "hits": [
             "2026-07-02-decision-hivelore-rename-compat-strategy"
@@ -1231,13 +1237,13 @@
           ],
           "surfaced_ids": [
             "2026-07-02-decision-process-gates-bind-agents-not-humans",
+            "2026-08-21-decision-process-gates-advisory-only-sensors-refuse",
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-08-21-architecture-gate-verdict-is-the-single-decision-rule",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-06-02-convention-verify-pipelines-before-closing",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate"
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant"
           ],
           "hits": [
             "2026-07-02-decision-process-gates-bind-agents-not-humans"
@@ -1255,12 +1261,12 @@
           "surfaced_ids": [
             "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
             "2026-07-02-decision-command-sensors-behaviour-bridge",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-06-02-architecture-mcp-tool-contract",
-            "2026-06-02-architecture-cli-command-surface"
+            "2026-07-05-convention-child-process-no-shell-interpolation",
+            "2026-07-03-attempt-running-hivelore-release-tag-right"
           ],
           "hits": [
             "2026-07-02-decision-review-warnings-aggregated-and-head-baseline"
@@ -1280,10 +1286,10 @@
             "2026-06-08-decision-semantic-gate-false-positive-reduction-sensorless-review-tes",
             "2026-06-03-gotcha-antipattern-self-match-on-memory-file-edit",
             "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
-            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-07-06-gotcha-gate-large-diff-robustness",
             "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
-            "2026-04-25-architecture-pure-tool-handlers",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-04-25-architecture-pure-tool-handlers"
           ],
           "hits": [
             "2026-07-02-decision-sensor-only-hard-block-determinism"
@@ -1300,13 +1306,13 @@
           ],
           "surfaced_ids": [
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-06-02-architecture-mcp-tool-contract",
-            "2026-07-02-decision-command-sensors-behaviour-bridge",
-            "2026-07-02-decision-hivelore-rename-compat-strategy"
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-06-02-architecture-cli-command-surface",
+            "2026-04-27-decision-zod-error-formatting-no-direct-import"
           ],
           "hits": [
             "2026-07-02-decision-surface-reduction-one-verb-per-job"
@@ -1365,13 +1371,13 @@
           ],
           "surfaced_ids": [
             "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
             "2026-06-02-convention-verify-pipelines-before-closing",
             "2026-06-02-decision-ci-decision-coverage-local-marker",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-07-02-decision-hivelore-rename-compat-strategy",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-07-02-decision-command-sensors-behaviour-bridge"
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish",
+            "2026-07-06-decision-de-ceremony-pass"
           ],
           "hits": [
             "2026-07-03-attempt-running-hivelore-release-tag-right"
@@ -1412,12 +1418,12 @@
           "surfaced_ids": [
             "2026-07-03-decision-command-sensor-flap-identical-content",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-06-02-architecture-cli-command-surface",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-07-02-decision-command-sensors-behaviour-bridge",
-            "2026-06-04-gotcha-prevention-not-recorded-in-precommit-gate",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390"
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-07-03-decision-sensor-ledger-ndjson-rolling-window"
           ],
           "hits": [
             "2026-07-03-decision-command-sensor-flap-identical-content"
@@ -1435,12 +1441,12 @@
           "surfaced_ids": [
             "2026-07-03-decision-gate-passes-as-synthetic-ledger-row",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
             "2026-07-03-decision-sensor-ledger-ndjson-rolling-window",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-07-03-decision-command-sensor-flap-identical-content",
+            "2026-06-02-architecture-core-pure-domain-layer"
           ],
           "hits": [
             "2026-07-03-decision-gate-passes-as-synthetic-ledger-row"
@@ -1459,11 +1465,11 @@
             "2026-07-03-decision-init-bridges-detected-clients-default",
             "2026-06-02-architecture-cli-command-surface",
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish",
             "2026-06-02-decision-tools-must-be-environment-independent",
             "2026-06-02-convention-verify-pipelines-before-closing",
-            "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-04-27-decision-zod-error-formatting-no-direct-import",
-            "2026-06-02-convention-tool-ui-english-user-content-any-language"
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-07-07-decision-kill-haive-rename-migration"
           ],
           "hits": [
             "2026-07-03-decision-init-bridges-detected-clients-default"
@@ -1481,12 +1487,12 @@
           "surfaced_ids": [
             "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir",
             "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
+            "2026-07-06-decision-scaffold-property-differential-styles",
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-05-29-skill-close-session-properly",
-            "2026-04-25-architecture-pure-tool-handlers",
-            "2026-06-02-architecture-cli-command-surface"
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390"
           ],
           "hits": [
             "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir"
@@ -1504,12 +1510,12 @@
           "surfaced_ids": [
             "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir",
             "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
+            "2026-07-06-decision-scaffold-property-differential-styles",
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-05-29-skill-close-session-properly",
-            "2026-06-02-architecture-cli-command-surface",
-            "2026-06-02-architecture-core-pure-domain-layer"
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390"
           ],
           "hits": [
             "2026-07-03-decision-scaffold-generates-pending-test-never-arms"
@@ -1526,13 +1532,13 @@
           ],
           "surfaced_ids": [
             "2026-06-08-decision-validated-by-provenance-human-agent-auto",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-07-03-decision-sensor-incident-provenance-on-frontmatter",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset",
             "2026-06-06-decision-harness-quality-batch-v0270",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
-            "2026-05-29-skill-save-decision-or-gotcha-mid-task",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390"
+            "2026-05-29-skill-save-decision-or-gotcha-mid-task"
           ],
           "hits": [
             "2026-07-03-decision-sensor-incident-provenance-on-frontmatter"
@@ -1540,7 +1546,7 @@
           "misses": [],
           "precision": 0.125,
           "recall": 1,
-          "best_rank": 2
+          "best_rank": 3
         },
         {
           "name": "2026-07-03-decision-sensor-ledger-ndjson-rolling-window",
@@ -1551,8 +1557,8 @@
             "2026-07-03-decision-sensor-ledger-ndjson-rolling-window",
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset",
             "2026-07-03-decision-command-sensor-flap-identical-content",
-            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-07-03-decision-gate-passes-as-synthetic-ledger-row",
+            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-04-28-gotcha-serializememory-undefined-values-crash"
           ],
           "hits": [
@@ -1571,12 +1577,12 @@
           "surfaced_ids": [
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset",
             "2026-07-03-decision-sensor-incident-provenance-on-frontmatter",
+            "2026-07-03-decision-command-sensor-flap-identical-content",
             "2026-06-02-architecture-core-pure-domain-layer",
             "2026-06-02-architecture-cli-command-surface",
-            "2026-07-03-decision-command-sensor-flap-identical-content",
-            "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
-            "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
+            "2026-07-03-decision-sensor-ledger-ndjson-rolling-window",
+            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
+            "2026-06-08-decision-validated-by-provenance-human-agent-auto"
           ],
           "hits": [
             "2026-07-03-decision-sensor-promoted-at-quarantine-reset"
@@ -1594,12 +1600,12 @@
           "surfaced_ids": [
             "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
-            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390"
           ],
           "hits": [
             "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
@@ -1617,11 +1623,11 @@
           "surfaced_ids": [
             "2026-07-04-decision-gate-surface-integrity-batch-v0390",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
-            "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
             "2026-07-04-gotcha-pending-oracle-fake-protection",
+            "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-06-06-decision-harness-quality-batch-v0270"
           ],
           "hits": [
@@ -1639,13 +1645,13 @@
           ],
           "surfaced_ids": [
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
-            "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-04-25-architecture-pure-tool-handlers",
-            "2026-06-02-architecture-mcp-tool-contract",
-            "2026-06-02-architecture-cli-command-surface"
+            "2026-07-05-convention-child-process-no-shell-interpolation",
+            "2026-04-25-architecture-pure-tool-handlers"
           ],
           "hits": [
             "2026-07-04-decision-prove-red-and-env-scrub-phase4"
@@ -1662,6 +1668,7 @@
           ],
           "surfaced_ids": [
             "2026-07-04-decision-stack-pack-rescue-strong-task-evidence",
+            "2026-08-21-decision-anchor-specificity-ranking-and-the-eval-tradeoff",
             "2026-06-02-architecture-core-pure-domain-layer",
             "2026-04-28-gotcha-serializememory-undefined-values-crash"
           ],
@@ -1669,7 +1676,7 @@
             "2026-07-04-decision-stack-pack-rescue-strong-task-evidence"
           ],
           "misses": [],
-          "precision": 0.333,
+          "precision": 0.25,
           "recall": 1,
           "best_rank": 1
         },
@@ -1681,11 +1688,11 @@
           "surfaced_ids": [
             "2026-07-04-gotcha-pending-oracle-fake-protection",
             "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
+            "2026-07-06-decision-scaffold-property-differential-styles",
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist",
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
             "2026-07-02-decision-command-sensors-behaviour-bridge",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
-            "2026-04-25-architecture-pure-tool-handlers",
-            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir"
           ],
           "hits": [
@@ -1704,12 +1711,12 @@
           "surfaced_ids": [
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
             "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-06-02-architecture-cli-command-surface",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-07-02-decision-process-gates-bind-agents-not-humans",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
+            "2026-06-02-architecture-cli-command-surface",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-07-06-decision-de-ceremony-pass"
           ],
           "hits": [
             "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant"
@@ -1727,12 +1734,12 @@
           "surfaced_ids": [
             "2026-07-05-convention-child-process-no-shell-interpolation",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
             "2026-04-25-architecture-pure-tool-handlers",
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-02-decision-command-sensors-behaviour-bridge",
             "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
-            "2026-07-04-gotcha-pending-oracle-fake-protection"
+            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
           ],
           "hits": [
             "2026-07-05-convention-child-process-no-shell-interpolation"
@@ -1769,13 +1776,13 @@
           ],
           "surfaced_ids": [
             "2026-07-05-convention-hivelore-mcp-package-export",
-            "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
             "2026-04-27-gotcha-mcp-exports-package-json",
-            "2026-07-05-convention-hivelore-workspace-dependencies",
             "2026-06-02-architecture-cli-command-surface",
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
+            "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-06-02-architecture-mcp-tool-contract"
+            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-07-05-convention-child-process-no-shell-interpolation"
           ],
           "hits": [
             "2026-07-05-convention-hivelore-mcp-package-export"
@@ -1791,14 +1798,14 @@
             "2026-07-05-convention-hivelore-workspace-dependencies"
           ],
           "surfaced_ids": [
-            "2026-07-05-convention-hivelore-workspace-dependencies",
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-07-05-convention-hivelore-mcp-package-export",
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
-            "2026-07-02-decision-hivelore-rename-compat-strategy",
-            "2026-04-27-gotcha-mcp-exports-package-json",
+            "2026-07-05-convention-hivelore-workspace-dependencies",
+            "2026-04-25-convention-use-pnpm-workspaces",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-04-27-decision-zod-error-formatting-no-direct-import"
+            "2026-04-27-decision-zod-error-formatting-no-direct-import",
+            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
+            "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
+            "2026-07-05-convention-child-process-no-shell-interpolation"
           ],
           "hits": [
             "2026-07-05-convention-hivelore-workspace-dependencies"
@@ -1806,7 +1813,7 @@
           "misses": [],
           "precision": 0.125,
           "recall": 1,
-          "best_rank": 1
+          "best_rank": 2
         },
         {
           "name": "2026-07-05-convention-root-verify-is-release-chain",
@@ -1834,12 +1841,12 @@
           "surfaced_ids": [
             "2026-07-05-gotcha-unsupported-benchmark-claims",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork",
             "2026-05-29-skill-close-session-properly",
             "2026-06-02-architecture-cli-command-surface",
             "2026-04-27-decision-zod-error-formatting-no-direct-import",
             "2026-06-02-decision-ci-decision-coverage-local-marker",
-            "2026-04-25-decision-esm-only",
-            "2026-06-04-decision-stack-pack-dedup-by-signature-and-coverage-self-exempt"
+            "2026-04-25-decision-esm-only"
           ],
           "hits": [],
           "misses": [
@@ -1857,12 +1864,12 @@
           "surfaced_ids": [
             "2026-07-05-decision-eval-golden-set-tier-contract-phase5",
             "2026-07-05-decision-passive-capture-distillation-phase2",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-06-02-architecture-cli-command-surface",
             "2026-06-06-decision-harness-quality-batch-v0270",
+            "2026-06-02-architecture-cli-command-surface",
             "2026-07-03-decision-command-sensor-flap-identical-content",
-            "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-04-28-gotcha-serializememory-undefined-values-crash"
+            "2026-07-03-attempt-duplicating-json-on-a-commander"
           ],
           "hits": [
             "2026-07-05-decision-eval-golden-set-tier-contract-phase5"
@@ -1880,12 +1887,12 @@
           "surfaced_ids": [
             "2026-07-05-decision-passive-capture-distillation-phase2",
             "2026-07-05-decision-eval-golden-set-tier-contract-phase5",
+            "2026-07-06-decision-de-ceremony-pass",
             "2026-06-02-architecture-core-pure-domain-layer",
             "2026-06-02-architecture-cli-command-surface",
             "2026-07-03-decision-command-sensor-flap-identical-content",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-06-07-convention-vscode-cli-calls-through-runhaive"
+            "2026-06-02-convention-tool-ui-english-user-content-any-language"
           ],
           "hits": [
             "2026-07-05-decision-passive-capture-distillation-phase2"
@@ -1904,11 +1911,11 @@
             "2026-07-05-decision-pr-loop-review-learnings-phase3",
             "2026-07-05-gotcha-github-review-text-is-untrusted-data",
             "2026-06-02-architecture-core-pure-domain-layer",
-            "2026-06-02-architecture-cli-command-surface",
             "2026-06-02-decision-tools-must-be-environment-independent",
+            "2026-06-02-architecture-cli-command-surface",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-06-07-convention-vscode-cli-calls-through-runhaive"
+            "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli",
+            "2026-06-02-convention-tool-ui-english-user-content-any-language"
           ],
           "hits": [
             "2026-07-05-decision-pr-loop-review-learnings-phase3"
@@ -1948,13 +1955,13 @@
           ],
           "surfaced_ids": [
             "2026-07-05-gotcha-github-review-text-is-untrusted-data",
+            "2026-07-06-gotcha-github-action-bundle-must-be-tracked",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-05-29-skill-close-session-properly",
             "2026-07-05-decision-pr-loop-review-learnings-phase3",
             "2026-07-05-gotcha-unsupported-benchmark-claims",
-            "2026-04-25-gotcha-tsup-externals-required",
-            "2026-04-27-gotcha-embeddings-load-error-double-print"
+            "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli"
           ],
           "hits": [
             "2026-07-05-gotcha-github-review-text-is-untrusted-data"
@@ -1988,6 +1995,434 @@
           "best_rank": 1
         },
         {
+          "name": "2026-07-06-decision-behaviour-coverage-loop-to-action",
+          "expect_ids": [
+            "2026-07-06-decision-behaviour-coverage-loop-to-action"
+          ],
+          "surfaced_ids": [
+            "2026-07-06-decision-behaviour-coverage-loop-to-action",
+            "2026-07-06-decision-behaviour-coverage-metric",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
+            "2026-06-02-architecture-cli-command-surface"
+          ],
+          "hits": [
+            "2026-07-06-decision-behaviour-coverage-loop-to-action"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-06-decision-behaviour-coverage-metric",
+          "expect_ids": [
+            "2026-07-06-decision-behaviour-coverage-metric"
+          ],
+          "surfaced_ids": [
+            "2026-07-06-decision-behaviour-coverage-metric",
+            "2026-07-06-decision-behaviour-coverage-loop-to-action",
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-05-28-decision-ship-embeddings-with-cli-mcp"
+          ],
+          "hits": [
+            "2026-07-06-decision-behaviour-coverage-metric"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-06-decision-de-ceremony-pass",
+          "expect_ids": [
+            "2026-07-06-decision-de-ceremony-pass"
+          ],
+          "surfaced_ids": [
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-03-decision-gate-passes-as-synthetic-ledger-row",
+            "2026-06-02-convention-verify-pipelines-before-closing",
+            "2026-07-03-decision-command-sensor-flap-identical-content",
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-07-03-attempt-running-hivelore-release-tag-right"
+          ],
+          "hits": [
+            "2026-07-06-decision-de-ceremony-pass"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-06-decision-scaffold-property-differential-styles",
+          "expect_ids": [
+            "2026-07-06-decision-scaffold-property-differential-styles"
+          ],
+          "surfaced_ids": [
+            "2026-07-06-decision-scaffold-property-differential-styles",
+            "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir",
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist",
+            "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
+            "2026-04-25-architecture-pure-tool-handlers",
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-06-02-architecture-core-pure-domain-layer"
+          ],
+          "hits": [
+            "2026-07-06-decision-scaffold-property-differential-styles"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-06-decision-scaffold-red-ref-oracle-assist",
+          "expect_ids": [
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist"
+          ],
+          "surfaced_ids": [
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist",
+            "2026-07-06-decision-scaffold-property-differential-styles",
+            "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
+            "2026-07-04-gotcha-pending-oracle-fake-protection",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-07-03-decision-scaffold-detection-in-mcp-monorepo-basedir",
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
+            "2026-07-03-decision-sensor-promoted-at-quarantine-reset"
+          ],
+          "hits": [
+            "2026-07-06-decision-scaffold-red-ref-oracle-assist"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-06-gotcha-gate-large-diff-robustness",
+          "expect_ids": [
+            "2026-07-06-gotcha-gate-large-diff-robustness"
+          ],
+          "surfaced_ids": [
+            "2026-07-06-gotcha-gate-large-diff-robustness",
+            "2026-06-08-decision-semantic-gate-false-positive-reduction-sensorless-review-tes",
+            "2026-06-09-gotcha-sensors-check-self-match-on-ai-files",
+            "2026-06-03-gotcha-antipattern-self-match-on-memory-file-edit",
+            "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
+            "2026-07-02-decision-sensor-only-hard-block-determinism",
+            "2026-04-25-architecture-pure-tool-handlers",
+            "2026-06-02-architecture-mcp-tool-contract"
+          ],
+          "hits": [
+            "2026-07-06-gotcha-gate-large-diff-robustness"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-06-gotcha-github-action-bundle-must-be-tracked",
+          "expect_ids": [
+            "2026-07-06-gotcha-github-action-bundle-must-be-tracked"
+          ],
+          "surfaced_ids": [
+            "2026-07-06-gotcha-github-action-bundle-must-be-tracked",
+            "2026-07-05-gotcha-github-review-text-is-untrusted-data",
+            "2026-04-25-convention-always-run-tests-before-commit",
+            "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli"
+          ],
+          "hits": [
+            "2026-07-06-gotcha-github-action-bundle-must-be-tracked"
+          ],
+          "misses": [],
+          "precision": 0.25,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+          "expect_ids": [
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install"
+          ],
+          "surfaced_ids": [
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-07-02-decision-hivelore-rename-compat-strategy",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-06-02-decision-ci-decision-coverage-local-marker"
+          ],
+          "hits": [
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
+          "expect_ids": [
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard"
+          ],
+          "surfaced_ids": [
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-06-07-gotcha-autogen-sensor-inverted-when-companion-longer-than-call",
+            "2026-07-02-decision-command-sensors-behaviour-bridge",
+            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
+            "2026-07-04-decision-prove-red-and-env-scrub-phase4",
+            "2026-07-06-decision-behaviour-coverage-loop-to-action",
+            "2026-06-06-decision-harness-quality-batch-v0270"
+          ],
+          "hits": [
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-07-decision-excellence-polish-pass-v0530",
+          "expect_ids": [
+            "2026-07-07-decision-excellence-polish-pass-v0530"
+          ],
+          "surfaced_ids": [
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-07-05-decision-eval-golden-set-tier-contract-phase5",
+            "2026-07-04-decision-prove-red-and-env-scrub-phase4",
+            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1",
+            "2026-06-07-gotcha-autogen-sensor-inverted-when-companion-longer-than-call",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install"
+          ],
+          "hits": [
+            "2026-07-07-decision-excellence-polish-pass-v0530"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-07-decision-kill-haive-rename-migration",
+          "expect_ids": [
+            "2026-07-07-decision-kill-haive-rename-migration"
+          ],
+          "surfaced_ids": [
+            "2026-07-07-decision-kill-haive-rename-migration",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-07-02-decision-hivelore-rename-compat-strategy",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-06-04-decision-precommit-autobrief-and-briefing-json"
+          ],
+          "hits": [
+            "2026-07-07-decision-kill-haive-rename-migration"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-07-07-decision-sharpen-surface-harden-gate",
+          "expect_ids": [
+            "2026-07-07-decision-sharpen-surface-harden-gate"
+          ],
+          "surfaced_ids": [
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-08-21-decision-process-gates-advisory-only-sensors-refuse",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-06-02-architecture-cli-command-surface",
+            "2026-07-04-decision-gate-surface-integrity-batch-v0390",
+            "2026-07-03-attempt-running-hivelore-release-tag-right"
+          ],
+          "hits": [
+            "2026-07-07-decision-sharpen-surface-harden-gate"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
+          "expect_ids": [
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete"
+          ],
+          "surfaced_ids": [
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-04-28-architecture-adding-new-mcp-tool",
+            "2026-06-02-convention-tool-ui-english-user-content-any-language",
+            "2026-04-25-architecture-pure-tool-handlers",
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-04-27-gotcha-version-define-tsup-and-vitest",
+            "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing"
+          ],
+          "hits": [
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish",
+          "expect_ids": [
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish"
+          ],
+          "surfaced_ids": [
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-03-decision-init-bridges-detected-clients-default",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-06-02-convention-verify-pipelines-before-closing",
+            "2026-06-02-architecture-cli-command-surface"
+          ],
+          "hits": [
+            "2026-08-17-gotcha-init-leaves-untracked-configs-that-block-enforce-finish"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-08-21-architecture-gate-verdict-is-the-single-decision-rule",
+          "expect_ids": [
+            "2026-08-21-architecture-gate-verdict-is-the-single-decision-rule"
+          ],
+          "surfaced_ids": [
+            "2026-08-21-architecture-gate-verdict-is-the-single-decision-rule",
+            "2026-07-05-attempt-ajouter-un-nouveau-sensor-discriminant",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-07-03-attempt-running-hivelore-release-tag-right",
+            "2026-07-06-decision-de-ceremony-pass",
+            "2026-06-02-architecture-cli-command-surface"
+          ],
+          "hits": [
+            "2026-08-21-architecture-gate-verdict-is-the-single-decision-rule"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork",
+          "expect_ids": [
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork"
+          ],
+          "surfaced_ids": [
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork",
+            "2026-07-03-attempt-duplicating-json-on-a-commander",
+            "2026-06-07-convention-vscode-cli-calls-through-runhaive",
+            "2026-06-02-architecture-cli-command-surface",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-04-27-gotcha-embeddings-load-error-double-print",
+            "2026-04-27-decision-zod-error-formatting-no-direct-import",
+            "2026-06-02-convention-tool-ui-english-user-content-any-language"
+          ],
+          "hits": [
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-08-21-decision-anchor-specificity-ranking-and-the-eval-tradeoff",
+          "expect_ids": [
+            "2026-08-21-decision-anchor-specificity-ranking-and-the-eval-tradeoff"
+          ],
+          "surfaced_ids": [
+            "2026-08-21-decision-anchor-specificity-ranking-and-the-eval-tradeoff",
+            "2026-07-04-decision-stack-pack-rescue-strong-task-evidence",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-06-02-architecture-mcp-tool-contract",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
+            "2026-07-05-convention-child-process-no-shell-interpolation",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-04-27-gotcha-mcp-exports-package-json"
+          ],
+          "hits": [
+            "2026-08-21-decision-anchor-specificity-ranking-and-the-eval-tradeoff"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-08-21-decision-process-gates-advisory-only-sensors-refuse",
+          "expect_ids": [
+            "2026-08-21-decision-process-gates-advisory-only-sensors-refuse"
+          ],
+          "surfaced_ids": [
+            "2026-08-21-decision-process-gates-advisory-only-sensors-refuse",
+            "2026-07-02-decision-process-gates-bind-agents-not-humans",
+            "2026-08-21-architecture-gate-verdict-is-the-single-decision-rule",
+            "2026-07-07-decision-excellence-polish-pass-v0530",
+            "2026-06-02-architecture-core-pure-domain-layer",
+            "2026-07-07-decision-sharpen-surface-harden-gate",
+            "2026-06-03-gotcha-regex-sensors-orphaned-from-precommit-gate",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install"
+          ],
+          "hits": [
+            "2026-08-21-decision-process-gates-advisory-only-sensors-refuse"
+          ],
+          "misses": [],
+          "precision": 0.125,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
+          "name": "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli",
+          "expect_ids": [
+            "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli"
+          ],
+          "surfaced_ids": [
+            "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli",
+            "2026-07-06-gotcha-github-action-bundle-must-be-tracked",
+            "2026-07-05-gotcha-github-review-text-is-untrusted-data"
+          ],
+          "hits": [
+            "2026-08-21-gotcha-github-action-must-bundle-deps-inverse-of-cli"
+          ],
+          "misses": [],
+          "precision": 0.333,
+          "recall": 1,
+          "best_rank": 1
+        },
+        {
           "name": "module format (ESM vs CommonJS)",
           "expect_ids": [
             "2026-04-25-decision-esm-only"
@@ -2000,7 +2435,7 @@
             "2026-06-08-architecture-code-map-ast-web-tree-sitter-vendored-grammars",
             "2026-04-28-attempt-npm-install-g-packagescli-packagesmcp",
             "2026-07-03-attempt-typechecking-cli-immediately-after-adding",
-            "2026-07-03-attempt-running-hivelore-release-tag-right"
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork"
           ],
           "hits": [
             "2026-04-25-decision-esm-only"
@@ -2042,11 +2477,11 @@
             "2026-04-25-gotcha-tsup-externals-required",
             "2026-04-27-decision-zod-error-formatting-no-direct-import",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-07-03-attempt-duplicating-json-on-a-commander",
             "2026-04-27-gotcha-embeddings-load-error-double-print",
-            "2026-05-29-skill-close-session-properly",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-05-29-skill-capture-failed-approach-immediately",
-            "2026-07-03-attempt-duplicating-json-on-a-commander"
+            "2026-05-29-skill-close-session-properly",
+            "2026-05-29-skill-capture-failed-approach-immediately"
           ],
           "hits": [
             "2026-04-25-gotcha-tsup-externals-required"
@@ -2063,13 +2498,13 @@
           ],
           "surfaced_ids": [
             "2026-04-28-architecture-adding-new-mcp-tool",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-04-27-gotcha-version-define-tsup-and-vitest",
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
-            "2026-04-25-architecture-pure-tool-handlers",
-            "2026-04-27-gotcha-mcp-exports-package-json"
+            "2026-04-25-architecture-pure-tool-handlers"
           ],
           "hits": [
             "2026-04-28-architecture-adding-new-mcp-tool"
@@ -2092,7 +2527,7 @@
             "2026-05-29-skill-close-session-properly",
             "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
             "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-07-03-attempt-typechecking-cli-immediately-after-adding"
+            "2026-08-21-decision-anchor-specificity-ranking-and-the-eval-tradeoff"
           ],
           "hits": [
             "2026-04-28-gotcha-serializememory-undefined-values-crash"
@@ -2108,14 +2543,14 @@
             "2026-05-28-decision-ship-embeddings-with-cli-mcp"
           ],
           "surfaced_ids": [
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-07-02-decision-hivelore-rename-compat-strategy",
-            "2026-07-05-convention-hivelore-workspace-dependencies",
-            "2026-07-03-attempt-duplicating-json-on-a-commander",
+            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-06-02-architecture-cli-command-surface",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-07-03-attempt-duplicating-json-on-a-commander",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-04-27-gotcha-embeddings-load-error-double-print",
+            "2026-07-02-decision-hivelore-rename-compat-strategy"
           ],
           "hits": [
             "2026-05-28-decision-ship-embeddings-with-cli-mcp"
@@ -2123,7 +2558,7 @@
           "misses": [],
           "precision": 0.125,
           "recall": 1,
-          "best_rank": 1
+          "best_rank": 2
         },
         {
           "name": "tool environment independence",
@@ -2135,10 +2570,10 @@
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-06-02-decision-tools-must-be-environment-independent",
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-07-03-attempt-typechecking-cli-immediately-after-adding",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-06-02-architecture-cli-command-surface"
+            "2026-07-03-attempt-running-hivelore-release-tag-right"
           ],
           "hits": [
             "2026-06-02-decision-tools-must-be-environment-independent"
@@ -2184,7 +2619,7 @@
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-05-29-skill-close-session-properly",
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
+            "2026-05-28-decision-codemap-tracked-files-by-default"
           ],
           "hits": [
             "2026-06-02-architecture-core-pure-domain-layer"
@@ -2202,8 +2637,8 @@
           "surfaced_ids": [
             "2026-05-28-decision-codemap-tracked-files-by-default",
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
-            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-06-08-architecture-code-map-ast-web-tree-sitter-vendored-grammars",
+            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-05-29-skill-close-session-properly",
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
@@ -2230,7 +2665,7 @@
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
             "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
-            "2026-04-25-architecture-pure-tool-handlers"
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard"
           ],
           "hits": [
             "2026-07-05-convention-child-process-no-shell-interpolation"
@@ -2276,7 +2711,7 @@
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
             "2026-06-05-attempt-running-pnpm-r-build-and",
-            "2026-07-03-attempt-typechecking-cli-immediately-after-adding"
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install"
           ],
           "hits": [
             "2026-07-05-convention-root-verify-is-release-chain"
@@ -2287,8 +2722,8 @@
           "best_rank": 1
         }
       ],
-      "mean_precision": 0.164,
-      "mean_recall": 0.971,
+      "mean_precision": 0.155,
+      "mean_recall": 0.975,
       "mrr": 0.939
     },
     "sensors": {
@@ -2422,7 +2857,7 @@
       ],
       "catch_rate": 1
     },
-    "score": 97
+    "score": 98
   },
   "authored_report": {
     "retrieval": {
@@ -2440,7 +2875,7 @@
             "2026-06-08-architecture-code-map-ast-web-tree-sitter-vendored-grammars",
             "2026-04-28-attempt-npm-install-g-packagescli-packagesmcp",
             "2026-07-03-attempt-typechecking-cli-immediately-after-adding",
-            "2026-07-03-attempt-running-hivelore-release-tag-right"
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork"
           ],
           "hits": [
             "2026-04-25-decision-esm-only"
@@ -2482,11 +2917,11 @@
             "2026-04-25-gotcha-tsup-externals-required",
             "2026-04-27-decision-zod-error-formatting-no-direct-import",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-07-03-attempt-duplicating-json-on-a-commander",
             "2026-04-27-gotcha-embeddings-load-error-double-print",
-            "2026-05-29-skill-close-session-properly",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
-            "2026-05-29-skill-capture-failed-approach-immediately",
-            "2026-07-03-attempt-duplicating-json-on-a-commander"
+            "2026-05-29-skill-close-session-properly",
+            "2026-05-29-skill-capture-failed-approach-immediately"
           ],
           "hits": [
             "2026-04-25-gotcha-tsup-externals-required"
@@ -2503,13 +2938,13 @@
           ],
           "surfaced_ids": [
             "2026-04-28-architecture-adding-new-mcp-tool",
+            "2026-08-17-decision-enforcement-profile-exposes-mem-update-not-mem-delete",
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-02-decision-surface-reduction-one-verb-per-job",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-04-27-gotcha-version-define-tsup-and-vitest",
             "2026-04-28-gotcha-mcp-tool-descriptions-llm-facing",
-            "2026-04-25-architecture-pure-tool-handlers",
-            "2026-04-27-gotcha-mcp-exports-package-json"
+            "2026-04-25-architecture-pure-tool-handlers"
           ],
           "hits": [
             "2026-04-28-architecture-adding-new-mcp-tool"
@@ -2532,7 +2967,7 @@
             "2026-05-29-skill-close-session-properly",
             "2026-07-03-decision-scaffold-generates-pending-test-never-arms",
             "2026-07-04-decision-gate-surface-integrity-batch-v0390",
-            "2026-07-03-attempt-typechecking-cli-immediately-after-adding"
+            "2026-08-21-decision-anchor-specificity-ranking-and-the-eval-tradeoff"
           ],
           "hits": [
             "2026-04-28-gotcha-serializememory-undefined-values-crash"
@@ -2548,14 +2983,14 @@
             "2026-05-28-decision-ship-embeddings-with-cli-mcp"
           ],
           "surfaced_ids": [
-            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-07-02-decision-hivelore-rename-compat-strategy",
-            "2026-07-05-convention-hivelore-workspace-dependencies",
-            "2026-07-03-attempt-duplicating-json-on-a-commander",
+            "2026-05-28-decision-ship-embeddings-with-cli-mcp",
             "2026-06-02-convention-tool-ui-english-user-content-any-language",
             "2026-06-02-architecture-cli-command-surface",
-            "2026-07-02-decision-surface-reduction-one-verb-per-job"
+            "2026-07-03-attempt-duplicating-json-on-a-commander",
+            "2026-07-02-decision-surface-reduction-one-verb-per-job",
+            "2026-04-27-gotcha-embeddings-load-error-double-print",
+            "2026-07-02-decision-hivelore-rename-compat-strategy"
           ],
           "hits": [
             "2026-05-28-decision-ship-embeddings-with-cli-mcp"
@@ -2563,7 +2998,7 @@
           "misses": [],
           "precision": 0.125,
           "recall": 1,
-          "best_rank": 1
+          "best_rank": 2
         },
         {
           "name": "tool environment independence",
@@ -2575,10 +3010,10 @@
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-06-02-decision-tools-must-be-environment-independent",
+            "2026-08-21-attempt-enabling-parallel-vitest-forks-pooloptionsforkssinglefork",
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install",
             "2026-07-03-attempt-duplicating-json-on-a-commander",
-            "2026-07-03-attempt-typechecking-cli-immediately-after-adding",
-            "2026-07-03-attempt-running-hivelore-release-tag-right",
-            "2026-06-02-architecture-cli-command-surface"
+            "2026-07-03-attempt-running-hivelore-release-tag-right"
           ],
           "hits": [
             "2026-06-02-decision-tools-must-be-environment-independent"
@@ -2624,7 +3059,7 @@
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-05-29-skill-close-session-properly",
             "2026-05-02-attempt-crosspackage-deps-with-xyz-ranges",
-            "2026-07-04-decision-ast-sensors-reuse-astgrep-phase1"
+            "2026-05-28-decision-codemap-tracked-files-by-default"
           ],
           "hits": [
             "2026-06-02-architecture-core-pure-domain-layer"
@@ -2642,8 +3077,8 @@
           "surfaced_ids": [
             "2026-05-28-decision-codemap-tracked-files-by-default",
             "2026-06-06-gotcha-coldstart-monorepo-nested-git-repos",
-            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-06-08-architecture-code-map-ast-web-tree-sitter-vendored-grammars",
+            "2026-06-02-architecture-core-pure-domain-layer",
             "2026-05-29-skill-close-session-properly",
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
@@ -2670,7 +3105,7 @@
             "2026-06-02-architecture-mcp-tool-contract",
             "2026-07-04-decision-prove-red-and-env-scrub-phase4",
             "2026-07-02-decision-review-warnings-aggregated-and-head-baseline",
-            "2026-04-25-architecture-pure-tool-handlers"
+            "2026-07-07-decision-behaviour-honesty-inverted-sensor-guard"
           ],
           "hits": [
             "2026-07-05-convention-child-process-no-shell-interpolation"
@@ -2716,7 +3151,7 @@
             "2026-05-29-skill-capture-failed-approach-immediately",
             "2026-05-29-skill-save-decision-or-gotcha-mid-task",
             "2026-06-05-attempt-running-pnpm-r-build-and",
-            "2026-07-03-attempt-typechecking-cli-immediately-after-adding"
+            "2026-07-07-attempt-relying-on-hivelore-enforce-install"
           ],
           "hits": [
             "2026-07-05-convention-root-verify-is-release-chain"
@@ -2729,7 +3164,7 @@
       ],
       "mean_precision": 0.125,
       "mean_recall": 1,
-      "mrr": 0.827
+      "mrr": 0.788
     },
     "sensors": {
       "cases": [
@@ -2862,14 +3297,14 @@
       ],
       "catch_rate": 1
     },
-    "score": 97
+    "score": 96
   },
   "gate_precision": {
-    "sensor_catches": 0,
-    "anti_pattern_catches": 108,
-    "useful": 109,
+    "sensor_catches": 6,
+    "anti_pattern_catches": 554,
+    "useful": 561,
     "rejections": 2,
-    "precision": 0.982,
+    "precision": 0.996,
     "suggestion": null
   }
 }

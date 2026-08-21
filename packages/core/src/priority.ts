@@ -10,6 +10,8 @@
  */
 import { isEnvWorkaroundMemory, isStackPackSeed } from "./relevance.js";
 
+import { DEFAULT_SPECIFICITY, isWeakAnchor } from "./anchor-specificity.js";
+
 export type MemoryPriority = "must_read" | "useful" | "background";
 
 /**
@@ -38,6 +40,12 @@ export interface PrioritySignals {
   moduleOrDomainMatch: boolean;
   /** A memory tag matched a task token. */
   tagTaskMatch: boolean;
+  /**
+   * How much information the matched anchor carries in THIS repo, 0..1 (see `anchor-specificity.ts`).
+   * 1 (the default) means "unknown or highly specific" and preserves the historical behaviour
+   * exactly, so a repo without git history ranks as it always did.
+   */
+  anchorSpecificity?: number;
 }
 
 export const DEFAULT_PRIORITY_SIGNALS: PrioritySignals = {
@@ -51,6 +59,7 @@ export const DEFAULT_PRIORITY_SIGNALS: PrioritySignals = {
   usefulSemantic: false,
   moduleOrDomainMatch: false,
   tagTaskMatch: false,
+  anchorSpecificity: DEFAULT_SPECIFICITY,
 };
 
 /** Convenience: build a full signal set from a partial one. */
@@ -72,15 +81,36 @@ export function classifyMemoryPriority(signals: PrioritySignals): MemoryPriority
   const isNegative = signals.type === "attempt";
   const isSkill = signals.type === "skill";
 
+  // An anchor match is the strongest signal available — WHEN the anchor is specific. On a file every
+  // commit touches (`package.json`, a lockfile, CI config) it is nearly no evidence at all: measured
+  // on this repo, the p90 memory claimed 60% of commits, so ~34 memories declared `must_read` on a
+  // single release commit and the briefing's 8 slots went to whichever sorted first. A weak anchor
+  // must therefore be corroborated by something about the task before it outranks everything.
+  const weakAnchor =
+    signals.directAnchor && isWeakAnchor(signals.anchorSpecificity ?? DEFAULT_SPECIFICITY);
+  const strongAnchor = signals.directAnchor && !weakAnchor;
+  // Corroboration deliberately EXCLUDES exactTaskMatch. That signal is a literal token AND-match
+  // over the whole memory body, and on a task-shaped corpus it fires on almost everything: a
+  // "chore: bump version" commit marked every package.json lesson `exact` and promoted all of them
+  // straight back to must_read, defeating the specificity check entirely. Literal body overlap is
+  // precisely the "global textual relevance" a field report identified as the ranking's weak point.
+  // Real corroboration is a strong semantic hit or an explicit symbol match.
+  const corroborated = signals.strongSemantic || signals.directSymbol;
+
   if (
     signals.requiresHumanApproval ||
-    signals.directAnchor ||
+    strongAnchor ||
     signals.directSymbol ||
+    (weakAnchor && corroborated) ||
     (isNegative && (signals.exactTaskMatch || signals.strongSemantic)) ||
     (isSkill && (signals.exactTaskMatch || signals.strongSemantic))
   ) {
     return "must_read";
   }
+
+  // A weak anchor still means the memory governs a file in play — it stays `useful`, ahead of a
+  // purely semantic hit. It just no longer crowds the top rank.
+  if (weakAnchor) return "useful";
 
   if (isStackPackSeed({ tags: signals.tags }) || isEnvWorkaroundMemory({ tags: signals.tags })) {
     // The down-rank exists to stop generic seeds crowding out repo-specific knowledge on weak

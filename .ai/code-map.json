@@ -98,26 +98,26 @@
         {
           "name": "Finding",
           "kind": "interface",
-          "line": 66
+          "line": 68
         },
         {
           "name": "registerDoctor",
           "kind": "function",
-          "line": 86
+          "line": 88
         },
         {
           "name": "isCodeMapNearEmpty",
           "kind": "function",
           "description": "Reserve \"near empty\" for catastrophic misses, not files that legitimately expose no symbols.",
-          "line": 751
+          "line": 786
         },
         {
           "name": "mcpRuntimeVersionFinding",
           "kind": "function",
-          "line": 761
+          "line": 796
         }
       ],
-      "loc": 1512
+      "loc": 1547
     },
     "packages/cli/src/commands/embeddings.ts": {
       "exports": [
@@ -705,16 +705,15 @@
         {
           "name": "detectFailure",
           "kind": "function",
-          "description": "Detect whether the tool response signals a failure worth capturing as mem_tried.",
-          "line": 118
+          "line": 130
         },
         {
           "name": "registerObserve",
           "kind": "function",
-          "line": 156
+          "line": 181
         }
       ],
-      "loc": 209
+      "loc": 234
     },
     "packages/cli/src/commands/precommit.ts": {
       "exports": [
@@ -1126,7 +1125,7 @@
           "line": 11
         }
       ],
-      "loc": 33
+      "loc": 37
     },
     "packages/core/src/agent-context.ts": {
       "summary": "Detect whether the current process runs inside an AI coding-agent harness.",
@@ -1144,6 +1143,64 @@
         }
       ],
       "loc": 49
+    },
+    "packages/core/src/anchor-specificity.ts": {
+      "summary": "How much does an anchor actually TELL US? A memory anchored to a file matched by the change is treated as `must_read` — the strongest ranking signal there is, ahead of anything semantic.",
+      "exports": [
+        {
+          "name": "AnchorChurn",
+          "kind": "type",
+          "description": "How many of the sampled commits touched each project-relative path.",
+          "line": 30
+        },
+        {
+          "name": "WEAK_ANCHOR_CHURN_RATIO",
+          "kind": "const",
+          "description": "Anchors touched by more than this share of recent commits carry too little information to promote a memory on their own.",
+          "line": 38
+        },
+        {
+          "name": "DEFAULT_SPECIFICITY",
+          "kind": "const",
+          "description": "Unknown churn must never penalise: a repo with no git history ranks exactly as it did before.",
+          "line": 41
+        },
+        {
+          "name": "anchorSpecificity",
+          "kind": "function",
+          "description": "Specificity of the BEST anchor that matched, in 0..1.",
+          "line": 52
+        },
+        {
+          "name": "isWeakAnchor",
+          "kind": "function",
+          "description": "True when this anchor is too common in this repo to promote a memory by itself.",
+          "line": 70
+        },
+        {
+          "name": "normalizeChurnPath",
+          "kind": "function",
+          "line": 74
+        },
+        {
+          "name": "churnForAnchors",
+          "kind": "function",
+          "description": "Roll per-file commit counts up to the anchor paths a memory actually declares, so a directory or glob anchor inherits the churn of everything under it.",
+          "line": 83
+        },
+        {
+          "name": "AnchorAuditRow",
+          "kind": "interface",
+          "line": 125
+        },
+        {
+          "name": "auditAnchorSpecificity",
+          "kind": "function",
+          "description": "Which memories claim relevance on nearly every change?  A memory anchored only to high-churn files is not wrong — the lesson really is about that file — but it cannot help a briefing choose.",
+          "line": 143
+        }
+      ],
+      "loc": 164
     },
     "packages/core/src/ast-parser.ts": {
       "summary": "Real-AST export extraction for the code-map — replaces the brittle per-language regex parsers.",
@@ -3205,38 +3262,38 @@
         {
           "name": "MemoryPriority",
           "kind": "type",
-          "line": 13
+          "line": 15
         },
         {
           "name": "PrioritySignals",
           "kind": "interface",
           "description": "Normalized priority evidence.",
-          "line": 20
+          "line": 22
         },
         {
           "name": "DEFAULT_PRIORITY_SIGNALS",
           "kind": "const",
-          "line": 43
+          "line": 51
         },
         {
           "name": "prioritySignals",
           "kind": "function",
           "description": "Convenience: build a full signal set from a partial one.",
-          "line": 57
+          "line": 66
         },
         {
           "name": "classifyMemoryPriority",
           "kind": "function",
           "description": "Classify a memory's briefing priority from its signals.",
-          "line": 71
+          "line": 80
         },
         {
           "name": "priorityRank",
           "kind": "function",
-          "line": 112
+          "line": 142
         }
       ],
-      "loc": 115
+      "loc": 145
     },
     "packages/core/src/recap.ts": {
       "summary": "Recap compaction — keep the auto-generated session recap from dominating the briefing head.",
@@ -4666,6 +4723,29 @@
       ],
       "loc": 28
     },
+    "packages/mcp/src/anchor-churn.ts": {
+      "summary": "Measure how often each file changes, so the ranker can tell a specific anchor from a common one.",
+      "exports": [
+        {
+          "name": "CHURN_SAMPLE_COMMITS",
+          "kind": "const",
+          "description": "Enough history to be representative, small enough to stay fast on a big repo.",
+          "line": 19
+        },
+        {
+          "name": "ChurnSample",
+          "kind": "interface",
+          "line": 21
+        },
+        {
+          "name": "loadAnchorChurn",
+          "kind": "function",
+          "description": "Churn for this repo, from cache when HEAD has not moved.",
+          "line": 67
+        }
+      ],
+      "loc": 82
+    },
     "packages/mcp/src/ast-sensors.ts": {
       "summary": "AST sensor adapter — the structural precision engine (excellence plan, Phase 1).",
       "exports": [
@@ -4929,116 +5009,126 @@
           "line": 235
         },
         {
-          "name": "proposeSensor",
+          "name": "loadAnchorChurn",
           "kind": "const",
           "line": 236
         },
         {
-          "name": "scaffoldTest",
+          "name": "CHURN_SAMPLE_COMMITS",
+          "kind": "const",
+          "line": 236
+        },
+        {
+          "name": "proposeSensor",
           "kind": "const",
           "line": 237
+        },
+        {
+          "name": "scaffoldTest",
+          "kind": "const",
+          "line": 238
         },
         {
           "name": "detectTestFrameworkForPaths",
           "kind": "const",
-          "line": 237
+          "line": 238
         },
         {
           "name": "detectTestFrameworksForAnchors",
           "kind": "const",
-          "line": 237
+          "line": 238
         },
         {
           "name": "memResolveProject",
           "kind": "const",
-          "line": 244
+          "line": 245
         },
         {
           "name": "memSuggestTopic",
           "kind": "const",
-          "line": 248
+          "line": 249
         },
         {
           "name": "memTimeline",
           "kind": "const",
-          "line": 252
+          "line": 253
         },
         {
           "name": "memConflictCandidates",
           "kind": "const",
-          "line": 256
+          "line": 257
         },
         {
           "name": "SERVER_NAME",
           "kind": "const",
-          "line": 263
+          "line": 264
         },
         {
           "name": "SERVER_VERSION",
           "kind": "const",
-          "line": 264
+          "line": 265
         },
         {
           "name": "ToolProfile",
           "kind": "type",
-          "line": 265
+          "line": 266
         },
         {
           "name": "ENFORCEMENT_PROFILE_TOOLS",
           "kind": "const",
-          "line": 278
+          "line": 279
         },
         {
           "name": "MAINTENANCE_PROFILE_TOOLS",
           "kind": "const",
-          "line": 303
+          "line": 304
         },
         {
           "name": "EXPERIMENTAL_PROFILE_TOOLS",
           "kind": "const",
           "description": "a deprecated alias of maintenance so existing HAIVE_TOOL_PROFILE=experimental configs keep working.",
-          "line": 329
+          "line": 330
         },
         {
           "name": "TOOL_PROFILES",
           "kind": "const",
-          "line": 333
+          "line": 334
         },
         {
           "name": "getAllowedToolsForProfile",
           "kind": "function",
-          "line": 339
+          "line": 340
         },
         {
           "name": "createHaiveServer",
           "kind": "function",
-          "line": 364
+          "line": 365
         },
         {
           "name": "parseMcpCliArgs",
           "kind": "function",
           "description": "Parse argv for the standalone haive-mcp binary / CLI subprocess parity.",
-          "line": 1351
+          "line": 1352
         },
         {
           "name": "printHaiveMcpVersion",
           "kind": "function",
           "description": "Print MCP server version (same as haive CLI when bundled together).",
-          "line": 1374
+          "line": 1375
         },
         {
           "name": "runHaiveMcpStdio",
           "kind": "function",
           "description": "Run the MCP server over stdio.",
-          "line": 1382
+          "line": 1383
         },
         {
           "name": "writeMcpRuntimeMarker",
           "kind": "function",
-          "line": 1391
+          "line": 1392
         }
       ],
-      "loc": 1400
+      "loc": 1401
     },
     "packages/mcp/src/session-tracker.ts": {
       "summary": "Auto-session tracker for autopilot mode.",
@@ -5163,48 +5253,54 @@
         {
           "name": "compactSummary",
           "kind": "function",
-          "line": 20
+          "line": 24
         },
         {
           "name": "classifyMemoryPriority",
           "kind": "function",
           "description": "Map the MCP briefing's evidence into the shared core classifier.",
-          "line": 32
+          "line": 36
         },
         {
           "name": "priorityRank",
           "kind": "function",
-          "line": 65
+          "line": 79
         },
         {
           "name": "classifyBriefingQuality",
           "kind": "function",
-          "line": 69
+          "line": 83
         },
         {
           "name": "explainWhySurfaced",
           "kind": "function",
-          "line": 122
+          "line": 136
+        },
+        {
+          "name": "matchedAnchorSpecificity",
+          "kind": "function",
+          "description": "Specificity of the anchor a memory matched on, for WITHIN-TIER ordering.",
+          "line": 205
         },
         {
           "name": "trySemanticHits",
           "kind": "function",
           "description": "Semantic hits for the briefing, or null when semantic ranking is unavailable for ANY reason.",
-          "line": 191
+          "line": 228
         },
         {
           "name": "trySemanticHitsWithNotice",
           "kind": "function",
           "description": "Same call, but surfacing WHY ranking degraded so the briefing can say so out loud.",
-          "line": 202
+          "line": 239
         },
         {
           "name": "loadModuleContexts",
           "kind": "function",
-          "line": 213
+          "line": 250
         }
       ],
-      "loc": 234
+      "loc": 271
     },
     "packages/mcp/src/tools/briefing-types.ts": {
       "exports": [
@@ -5317,25 +5413,25 @@
         {
           "name": "GetBriefingInputSchema",
           "kind": "const",
-          "line": 77
+          "line": 79
         },
         {
           "name": "GetBriefingZod",
           "kind": "const",
-          "line": 179
+          "line": 181
         },
         {
           "name": "GetBriefingInput",
           "kind": "type",
-          "line": 180
+          "line": 182
         },
         {
           "name": "getBriefing",
           "kind": "function",
-          "line": 182
+          "line": 184
         }
       ],
-      "loc": 1091
+      "loc": 1107
     },
     "packages/mcp/src/tools/get-project-context.ts": {
       "exports": [

@@ -30,6 +30,7 @@ import {
   loadConfig,
   resolveGatePolicy,
   describePosture,
+  auditAnchorSpecificity,
   loadMemoriesFromDirDetailed,
   loadSensorLedger,
   loadUsageIndex,
@@ -42,6 +43,7 @@ import {
   type SensorTarget,
   type UsageEvent,
 } from "@hivelore/core";
+import { loadAnchorChurn } from "@hivelore/mcp";
 import { ui } from "../utils/ui.js";
 import { collectScaffoldLoopGaps, describeScaffoldGap } from "../utils/post-incident-scan.js";
 
@@ -372,6 +374,39 @@ export function registerDoctor(program: Command): void {
               : 'Set enforcement.posture to "advisory" | "balanced" | "strict" in .ai/hivelore.config.json.',
         });
       }
+
+      // Anchors that claim every commit. Invisible until measured, and they are what makes a mature
+      // corpus feel useless: they occupy briefing slots on work they have nothing to do with.
+      try {
+        const churn = await loadAnchorChurn(paths);
+        if (churn) {
+          const fileChurn = new Map(Object.entries(churn.files));
+          const rows = auditAnchorSpecificity(
+            memories.map(({ memory: m }) => ({
+              id: m.frontmatter.id,
+              anchorPaths: m.frontmatter.anchor.paths,
+            })),
+            fileChurn,
+            churn.total_commits,
+          );
+          if (rows.length > 0) {
+            const worst = rows.slice(0, 5).map((r) => {
+              const widest = r.broad[0];
+              return `${r.id} (${widest ? `${widest.path} — ${Math.round(widest.ratio * 100)}% of commits` : "broad"})`;
+            });
+            findings.push({
+              severity: "info",
+              code: "memory-broad-anchors",
+              message:
+                `${rows.length} memor${rows.length === 1 ? "y is" : "ies are"} anchored only to files most commits ` +
+                `touch, so they claim relevance on almost every change and crowd the briefing:\n  ${worst.join("\n  ")}`,
+              fix:
+                "Add the precise path each lesson is really about: " +
+                "`hivelore memory update <id> --paths <specific-file>`. Broad anchors still rank, just not first.",
+            });
+          }
+        }
+      } catch { /* best-effort: an audit must never fail doctor */ }
 
       // Honest protection signal: Hivelore's headline claim is "blocks the repeat". If every sensor is
       // warn-only, enforcement is *advisory*, not blocking — say so (and pull down protection_score)

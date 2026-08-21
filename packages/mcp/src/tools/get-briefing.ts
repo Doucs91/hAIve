@@ -45,6 +45,7 @@ import {
   type UsageIndex,
 } from "@hivelore/core";
 import { z } from "zod";
+import { loadAnchorChurn } from "../anchor-churn.js";
 import type { HaiveContext } from "../context.js";
 import { pendingDistillPath, type PendingDistill } from "../session-tracker.js";
 import type {
@@ -57,6 +58,7 @@ import type {
 import {
   classifyBriefingQuality,
   classifyMemoryPriority,
+  matchedAnchorSpecificity,
   compactSummary,
   explainWhySurfaced,
   loadModuleContexts,
@@ -197,6 +199,8 @@ export async function getBriefing(
   let searchMode: BriefingOutput["search_mode"] = "literal";
   let usage: UsageIndex = { version: 1, updated_at: "", by_id: {} };
   let byId = new Map<string, LoadedMemory>();
+  // Anchor churn for this repo (see anchor-churn.ts). Null = unmeasurable → ranking unchanged.
+  let churn: Awaited<ReturnType<typeof loadAnchorChurn>> = null;
   const allowedScopes = input.memory_scopes ? new Set(input.memory_scopes) : null;
   const scopeAllowed = (loaded: LoadedMemory): boolean =>
     allowedScopes === null || allowedScopes.has(loaded.memory.frontmatter.scope);
@@ -353,6 +357,12 @@ export async function getBriefing(
       }
     }
 
+    // ── Anchor specificity ───────────────────────────────────────────────────
+    // How discriminating is an anchor match in THIS repo? Best-effort and cached: a repo with no
+    // git history returns null and ranking is unchanged. Only meaningful when files were passed,
+    // since anchors cannot match without them.
+    churn = input.files.length > 0 ? await loadAnchorChurn(ctx.paths).catch(() => null) : null;
+
     // ── Progressive disclosure for skills ────────────────────────────────────
     // A skill that declares `activation` triggers is disclosed only when the task or
     // edited files match; an activated skill earns a ranking boost (it's a playbook
@@ -417,10 +427,16 @@ export async function getBriefing(
       // popular-but-unrelated attempt (whose type+confidence head start is ~7), yet far below
       // the priority tier (×100) so anchored/symbol matches are never displaced.
       const lexScore = (m: BriefingMemory): number => 12 * (lexNorm.get(m.id) ?? 0);
-      const sa = priorityRank(classifyMemoryPriority(a, byId.get(a.id), input.files, input.symbols)) * 100
-        + reasonScore(a) + confidenceScore(a) + impactScore(a) + activationBoost(a) + lexScore(a) + (a.semantic_score ?? 0);
-      const sb = priorityRank(classifyMemoryPriority(b, byId.get(b.id), input.files, input.symbols)) * 100
-        + reasonScore(b) + confidenceScore(b) + impactScore(b) + activationBoost(b) + lexScore(b) + (b.semantic_score ?? 0);
+      // Anchor specificity (0..6): breaks the tie WITHIN a tier. On a release commit ~34 memories
+      // legitimately match `package.json` and used to tie exactly, so which 8 surfaced was
+      // arbitrary. Weighted below the priority tier (x100) and comparable to lexical relevance —
+      // it orders equals, it never overrules a stronger match.
+      const specScore = (m: BriefingMemory): number =>
+        6 * matchedAnchorSpecificity(byId.get(m.id), input.files, churn);
+      const sa = priorityRank(classifyMemoryPriority(a, byId.get(a.id), input.files, input.symbols, churn)) * 100
+        + reasonScore(a) + confidenceScore(a) + impactScore(a) + activationBoost(a) + lexScore(a) + specScore(a) + (a.semantic_score ?? 0);
+      const sb = priorityRank(classifyMemoryPriority(b, byId.get(b.id), input.files, input.symbols, churn)) * 100
+        + reasonScore(b) + confidenceScore(b) + impactScore(b) + activationBoost(b) + lexScore(b) + specScore(b) + (b.semantic_score ?? 0);
       return sb - sa;
     });
 
@@ -636,7 +652,7 @@ export async function getBriefing(
 
   let outputMemories = formattedMemories.map((m) => ({
     ...m,
-    priority: classifyMemoryPriority(m, byId.get(m.id), input.files, input.symbols),
+    priority: classifyMemoryPriority(m, byId.get(m.id), input.files, input.symbols, churn),
     why: explainWhySurfaced(m, byId.get(m.id), input.files, inferred),
   }));
 

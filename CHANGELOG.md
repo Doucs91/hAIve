@@ -6,6 +6,73 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.0] — The briefing ranks by how much an anchor actually tells us
+
+A field report scored briefing usefulness **30/100** while `hivelore eval` reported **98% recall**.
+Both numbers were correct. This release is what sat between them.
+
+### What the measurement found
+
+Replaying the last 25 real commits through the briefing — ground truth taken from anchors rather
+than from a hand-written query — showed the median commit had **34 memories legitimately claiming
+`must_read`** for 8 slots. Recall@8 was pinned near its arithmetic ceiling and the slots went to
+whichever plausible memory sorted first.
+
+The cause, measured over 149 commits: **`package.json` is touched by 106 of them (71%)**. A lesson
+about cross-package dependency ranges therefore declared itself `must_read` on every release commit.
+The median memory claims 12 of 60 commits; the p90 claims 36.
+
+An anchor match was treated as the strongest signal available regardless of how much it discriminates.
+
+### The correction
+
+`anchor-specificity.ts` weights a match by how rare the matched path is — plain IDF, applied to
+anchors. An anchor touched by more than 35% of recent commits no longer promotes a memory on its
+own; it needs a strong semantic hit or a symbol match. Specificity also breaks ties **within** a
+tier, so among memories that legitimately matched, the discriminating one comes first.
+
+Corroboration deliberately excludes `exactTaskMatch`: it is a literal AND-match over the whole
+memory body, and on a task-shaped corpus it fires on nearly everything — a `chore: bump version`
+commit marked every `package.json` lesson `exact` and promoted all of them straight back, silently
+defeating the check. Literal body overlap is precisely the "global textual relevance" the report
+identified as the ranking's weak point.
+
+| measured on 25 real commits | before | after |
+|---|---|---|
+| mean specificity of the matched anchor | 0.73 | **0.82** |
+| briefing slots spent on a low-information anchor | 17% | **4%** |
+
+Churn is measured with one `git log -200`, cached in gitignored `.ai/.cache/` and invalidated by
+HEAD. **Unmeasurable churn scores 1**, so a repo without git history ranks exactly as it did before.
+
+### `hivelore doctor` now names the memories to re-anchor
+
+`memory-broad-anchors` lists the memories anchored only to files most commits touch, with the share
+of commits each anchor claims. The fix is always additive — give the lesson the precise path it is
+really about — and it turns an invisible ranking problem into a corpus-hygiene task.
+
+### The eval baseline was re-cut, deliberately
+
+`hivelore eval` went **97 → 96** (MRR 0.946 → 0.939). Recall stayed at 98% and no case became a
+miss: the drop is a slightly lower rank, never a lost memory.
+
+The eval cannot see the benefit by construction — its cases ask *"given a query written to find
+memory X, does X surface?"*, which never puts two anchors in competition. That blind spot is exactly
+why it reported 98% while a real session reported 30/100. Do not recover the point by relaxing the
+rule; add cases where several memories legitimately match the same files.
+
+### Fixed — the passive-capture detector fired on its own source code
+
+Of 256 real observations captured in this repository, **all three `failure_hint` flags were false
+positives**, and the third fired while investigating the second: running
+`grep -A22 "function detectFailure" observe.ts` was recorded as a failure because its output *is*
+the list of error strings the function matches on. Reading the detector triggered the detector.
+
+A command that exited 0 did not fail, whatever words appear in its output. Text signatures are now
+only a fallback for when the harness reports no exit code at all; exit codes stay authoritative and
+remain guarded against commands that routinely return non-zero.
+
+
 ## [0.56.0] — Making the existing parts excellent: one decision rule, one posture, one line per refusal
 
 No new capability. Six things Hivelore already did, done properly — each one chosen from friction
