@@ -6,6 +6,35 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.3] — `enforce finish` checks the last link of the release chain
+
+The gate verified commit, version, tag, push and CI — everything except whether the release actually
+shipped. Three consecutive versions sat tagged and green while npm stayed several behind, because
+the publish workflow **skips rather than fails** when its token is absent. Green CI on an
+unpublished release looks exactly like a shipped one, so nothing ever said a word.
+
+`enforce finish` now asks the registry.
+
+**The severity split is the design.** `finish` runs BEFORE you publish, so "HEAD's version is not on
+npm yet" is the normal state and is reported as **info** — a gate that cannot pass in the normal flow
+is a gate people switch off. A tagged version the registry **skipped** is a **warning**: it was
+tagged, so it was meant to ship, and it silently never did. It never blocks; publishing is the
+human's call.
+
+```
+⚠ npm-releases-skipped: 1 tagged release(s) never reached npm — @hivelore/cli is on 0.57.1: v0.57.2.
+  fix: Registry versions are not cumulative, so publishing the newest is enough: …
+```
+
+Best-effort throughout: no registry, no network, a private package or none at all are all "cannot
+tell", never a failure. The package name is derived from the manifests that already carry the
+lockstep version rather than hardcoded, so it works outside this repo, and a single-package repo
+resolves to its root `package.json`. Disable with `enforcement.npmPublishCheck: "off"`.
+
+The verdict logic is pure and lives in `core/npm-publication.ts` — the registry lookup and tag
+listing stay in the CLI, so the six severity cases are unit-tested without a network call.
+
+
 ## [0.57.2] — Documentation is a deliverable, so it gets checked like one
 
 Both READMEs had drifted six weeks behind the code and described a gate that no longer exists. The

@@ -24,6 +24,7 @@ import {
   loadConfig,
   detectAgentContext,
   loadMemoriesFromDir,
+  classifyNpmPublication,
   buildBaselineHealthFinding,
   computeBaselineHealth,
   decideVerdict,
@@ -829,7 +830,73 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
   }
 
   findings.push(...await verifyGithubActionsForHead(root, status));
+  findings.push(...await verifyNpmPublication(root, version, config));
   return finishReport(root, initialized, mode, findings, config);
+}
+
+
+/**
+ * Registry side of the release chain. The verdict logic is pure and lives in
+ * `core/npm-publication.ts`; this resolves the package name, asks the registry, and lists the tags.
+ * Best-effort throughout: no registry, no network, a private package or none at all are all
+ * "cannot tell", never a failure. Off with `enforcement.npmPublishCheck: "off"`.
+ */
+async function verifyNpmPublication(
+  root: string,
+  version: string,
+  config: HaiveConfig,
+): Promise<EnforcementFinding[]> {
+  if (config.enforcement?.npmPublishCheck === "off") return [];
+
+  const packageName = await primaryPublishablePackage(root);
+  if (!packageName) return []; // nothing is published from here — stay silent rather than add noise
+
+  const published = await runCommand("npm", ["view", packageName, "version"], root)
+    .then((out) => out.trim())
+    .catch(() => null);
+  const publishedVersion = published && /^\d/.test(published) ? published : null;
+
+  const verdict = classifyNpmPublication({
+    packageName,
+    localVersion: version,
+    publishedVersion,
+    taggedBetween: publishedVersion ? await taggedVersionsBetween(root, publishedVersion, version) : [],
+    publishHint: `\`gh workflow run release -f tag=v${version}\` or \`pnpm run publish:all\``,
+  });
+  return [{
+    severity: verdict.severity,
+    code: verdict.code,
+    message: verdict.message,
+    ...(verdict.fix ? { fix: verdict.fix } : {}),
+    ...(verdict.severity === "warn" ? { impact: 10 } : {}),
+  }];
+}
+
+/**
+ * The package whose registry version stands for the release. Derived from the files that already
+ * carry the lockstep version rather than hardcoded, so this works outside this repo: the first
+ * non-private one with a name wins, and a single-package repo resolves to its root package.json.
+ */
+async function primaryPublishablePackage(root: string): Promise<string | null> {
+  for (const file of VERSION_FILES) {
+    const manifest = await readFile(path.join(root, file), "utf8")
+      .then((raw) => JSON.parse(raw) as { name?: unknown; private?: unknown })
+      .catch(() => null);
+    if (!manifest || manifest.private === true) continue;
+    if (typeof manifest.name === "string" && manifest.name.length > 0) return manifest.name;
+  }
+  return null;
+}
+
+/** Version tags strictly between what npm has and what HEAD carries — the ones that were skipped. */
+async function taggedVersionsBetween(root: string, after: string, before: string): Promise<string[]> {
+  const tags = (await runCommand("git", ["tag", "--list", "v*"], root).catch(() => ""))
+    .split("\n")
+    .map((line) => line.trim().replace(/^v/, ""))
+    .filter((v) => /^\d+\.\d+\.\d+$/.test(v));
+  return [...new Set(tags)]
+    .filter((v) => compareSemver(v, after) > 0 && compareSemver(v, before) < 0)
+    .sort(compareSemver);
 }
 
 /**

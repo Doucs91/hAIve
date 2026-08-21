@@ -12,6 +12,7 @@ export * from "./context-throttle.js";
 export * from "./gate-reminder.js";
 export * from "./gate-verdict.js";
 export * from "./anchor-specificity.js";
+export * from "./npm-publication.js";
 export * from "./eval.js";
 export * from "./confidence.js";
 export * from "./relevance.js";

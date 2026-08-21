@@ -293,6 +293,17 @@ export interface HaiveConfig {
     /** Require explicit resolution of a diff that demotes, rewrites, or removes a BLOCK sensor. */
     sensorWeakeningGate?: "warn" | "block";
     /**
+     * Whether `hivelore enforce finish` checks that tagged releases actually reached the npm
+     * registry. Default on; set "off" for repos that publish elsewhere or not at all.
+     *
+     * It never blocks. `finish` runs BEFORE you publish, so "HEAD is not on npm yet" is the normal
+     * state and is reported as info. A tagged version the registry SKIPPED is reported as a warning:
+     * it was tagged, so it was meant to ship. Three consecutive releases were lost that way — the
+     * publish workflow skips rather than fails when NPM_TOKEN is absent, and green CI on an
+     * unpublished release looks exactly like a shipped one.
+     */
+    npmPublishCheck?: "off" | "warn";
+    /**
      * How `hivelore enforce finish` reacts to hard failures observed this session that were never
      * captured as a lesson (`mem_tried`):
      *   - off:   ignore
