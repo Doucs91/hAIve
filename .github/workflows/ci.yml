@@ -15,7 +15,13 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
+      # Full history: the eval measures anchor specificity, which is IDF over recent commits.
+      # A shallow clone (the checkout default) yields a 1-commit sample where every file scores
+      # 100% churn — the code falls back to "unknown" and ranks as before, so CI would silently
+      # stop exercising the ranking it is meant to gate.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:

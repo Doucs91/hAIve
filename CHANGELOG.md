@@ -6,6 +6,21 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.1] — Churn needs a real sample, or it is not a measurement
+
+`v0.57.0` scored 96 locally and **94 in CI on the same commit**, and the eval gate caught it.
+
+Anchor specificity is IDF over recent commits, and IDF over one document is meaningless.
+`actions/checkout` defaults to depth 1, so a shallow clone is the normal state in CI: `git log -200`
+returned a single commit, every file it touched scored 100% churn, and **every anchor was classified
+weak**. Strictly worse than not measuring at all — and it would have hit any user whose checkout is
+shallow, on their machine only.
+
+- `MIN_CHURN_SAMPLE = 20`: below it, churn is reported as unknown, which ranks exactly as before.
+- The repo's own `ci` workflow now checks out with `fetch-depth: 0`, so the eval gate keeps
+  exercising the ranking it exists to protect rather than silently falling back.
+
+
 ## [0.57.0] — The briefing ranks by how much an anchor actually tells us
 
 A field report scored briefing usefulness **30/100** while `hivelore eval` reported **98% recall**.

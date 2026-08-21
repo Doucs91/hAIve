@@ -18,6 +18,17 @@ const run = promisify(execFile);
 /** Enough history to be representative, small enough to stay fast on a big repo. */
 export const CHURN_SAMPLE_COMMITS = 200;
 
+/**
+ * Below this many commits, churn is not measured — it is imagined.
+ *
+ * IDF over one document is meaningless: in a shallow clone (`actions/checkout` defaults to depth 1,
+ * so this is the normal state in CI) `git log -200` returns a single commit, every file it touched
+ * scores 1/1 = 100% churn, and EVERY anchor is classified weak. That is strictly worse than not
+ * measuring at all, and it is how this landed: local runs scored 96 while CI scored 94 on the same
+ * commit. Too small a sample must fall back to "unknown", which ranks exactly as before.
+ */
+export const MIN_CHURN_SAMPLE = 20;
+
 export interface ChurnSample {
   head: string;
   total_commits: number;
@@ -57,7 +68,7 @@ async function measureChurn(root: string): Promise<ChurnSample | null> {
     // many times it appears.
     for (const file of touched) files[file] = (files[file] ?? 0) + 1;
   }
-  return total > 0 ? { head, total_commits: total, files } : null;
+  return total >= MIN_CHURN_SAMPLE ? { head, total_commits: total, files } : null;
 }
 
 /**
@@ -71,7 +82,7 @@ export async function loadAnchorChurn(paths: HaivePaths): Promise<ChurnSample | 
     const cached = await readFile(cacheFile, "utf8")
       .then((raw) => JSON.parse(raw) as ChurnSample)
       .catch(() => null);
-    if (cached?.head === head && cached.total_commits > 0) return cached;
+    if (cached?.head === head && cached.total_commits >= MIN_CHURN_SAMPLE) return cached;
   }
   const measured = await measureChurn(paths.root).catch(() => null);
   if (!measured) return null;

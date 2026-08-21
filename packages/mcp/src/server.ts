@@ -233,7 +233,7 @@ export {
 } from "./ast-sensors.js";
 export { memTried, type MemTriedOutput } from "./tools/mem-tried.js";
 export { reportFriction, type ReportFrictionOutput } from "./tools/report-friction.js";
-export { loadAnchorChurn, CHURN_SAMPLE_COMMITS, type ChurnSample } from "./anchor-churn.js";
+export { loadAnchorChurn, CHURN_SAMPLE_COMMITS, MIN_CHURN_SAMPLE, type ChurnSample } from "./anchor-churn.js";
 export { proposeSensor, type ProposeSensorOutput } from "./tools/propose-sensor.js";
 export {
   scaffoldTest,
