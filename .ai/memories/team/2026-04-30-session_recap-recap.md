@@ -5,63 +5,57 @@ type: session_recap
 status: validated
 anchor:
   paths:
+    - packages/core/src/gate-verdict.ts
+    - packages/core/test/gate-verdict.test.ts
     - packages/cli/src/commands/enforce.ts
-    - packages/cli/src/commands/init.ts
-    - packages/cli/src/commands/stats.ts
-    - packages/cli/src/commands/bridges.ts
-    - packages/core/src/code-map.ts
-    - packages/core/src/prevention.ts
-    - packages/core/src/sensors.ts
-    - packages/core/src/gate-reminder.ts
-    - packages/mcp/src/embeddings-runtime.ts
-    - packages/github-action/tsup.config.ts
+    - packages/cli/src/commands/doctor.ts
+    - packages/core/src/config.ts
+    - packages/core/src/sensor-suggest.ts
+    - packages/cli/test/generated-artifacts.test.ts
+    - packages/cli/vitest.config.ts
   symbols: []
 tags:
   - session
   - recap
 created_at: '2026-04-30T00:02:07.282Z'
 expires_when: null
-verified_at: '2026-08-21T00:51:35.848Z'
+verified_at: '2026-08-21T03:08:40.072Z'
 stale_reason: null
 related_ids: []
 last_read_at: null
 topic: session-recap-team
-revision_count: 42
+revision_count: 43
 requires_human_approval: false
 validated_by: null
 ---
 ## Goal
-Work through a v0.54.0 user field report (62/100, two production repos) and implement every defect fix and improvement that stood up to verification.
+Improve six existing parts of Hivelore to excellence without adding any new capability, following my own analysis of the friction observed while working in this repo.
 
 ## Accomplished
-- Reproduced and fixed the invalid generated `hivelore-enforcement.yml` (TS `\n` escapes broke the YAML scalar); receipt body now rendered by `stats receipt --comment --gate`, no jq program in YAML. Added `generated-workflows.test.ts` and PROVED it fails on the pre-fix artifact with the reporter's exact error (line 47, col 1).
-- Fixed the GitHub Action shipping unbundled deps (tsup externals). New `tsup.config.ts` with `noExternal`, bundle 12 KB → 528 KB, verified by executing it in an empty dir. Added `bundle.test.ts` + two CI steps (dist in sync, smoke-run with no node_modules).
-- Found and fixed the ROOT CAUSE of the "briefing never helped" complaint: every embeddings call site wrapped only the dynamic `import()`, leaving `semanticSearch()` outside the try — so a broken native dep crashed `get_briefing` instead of degrading to lexical. New `runSemantic` guard covers load+call at all sites; messages now separate "not installed" from "installed but broken".
-- Made `.ai/code-map.json` deterministic: no absolute `root`, no per-run `generated_at` (both back-filled on load), sorted keys, and no write when content is unchanged.
-- Gate posture: new `enforcement.processGate` (default `warn`), score-threshold demoted to a non-blocking measurement and suppressed when something really refused, sensor findings now carry `file` + `matched_line`, stale-anchor blocking scoped to touched files.
-- Ergonomics: stack packs opt-in, `bridges sync --all` requires `--yes`, shared `explainSensorRejection` naming the warn-first bootstrap path, 24h throttle on repeated advisories, anchor suggestions on anchorless `memory save`, MCP restart notice at init.
-- 892 tests green; full verify chain (build/artifacts/typecheck/test/eval gate) passes at 0.55.0.
-
-## Discoveries & surprises
-- The invalid-YAML defect was three lines of test away for its whole life: nothing ever parsed a file `init` generates. Same class as the Action bug — nothing ever EXECUTED the bundle we publish. Both artifacts were "verified" only by building them.
-- The embeddings guard bug is a general pattern worth watching for: wrapping the cheap `import()` of an optional dependency but not the first CALL, which is where lazy native runtimes actually load. It made an enhancement failure look like a product failure.
-- Three capabilities the report asked for as missing already existed and were simply unfindable: PR-review→memory (`ingest --from github-pr`), structural sensors (`--kind ast|shell|test`), and anchor-proximity briefing ranking (`directAnchor` → must_read). Absence of discoverability reads as absence of feature.
-- The old committed code-map held 342 files, 140 of them under gitignored `engram/` which is not even on disk any more. Regenerating dropped it to a correct 197.
-- `mem_save` again proposed an INVERTED sensor seed (`uses: Doucs91`, which matches correct usage). Not armed. Third time this generator has suggested a fires-on-correct pattern.
+- Extracted the gate's decision rule into a pure `core/gate-verdict.ts` (337 lines), replacing three stacked downgrade passes in `enforce.ts`. 18 unit tests, ~30ms.
+- Added `enforcement.posture` (advisory | balanced | strict) collapsing 24 interacting knobs into one choice; individual switches still override; `doctor` prints the effective posture.
+- Deduplicated refusals by memory id: one lesson now produces one line naming the file and the offending source line (was four lines under two codes).
+- Redefined the score as `knowledge-layer health`, computed from the repo's standing state only — content catches excluded — and relabelled in output.
+- Extended the generated-artifact harness to git hooks: `sh -n` over every managed hook, including when appended after a foreign husky hook (16 tests). No shell syntax check had existed anywhere.
+- Made the sensor seed generator test candidates against the lesson's own "Instead, use" / "How to apply" sections and drop inverted ones; discriminating `absent` sensors exempt.
+- Full chain green at 0.56.0: 8+57+4+14+2 test files, artifacts OK, eval gate exit 0.</accomplished>
+<parameter name="discoveries">- Extracting the rule caught a regression my own rewrite introduced: the human carve-out was being applied at CI stage, where it must never apply. The old code had `stage !== "ci"` inline; I lost it, and a millisecond unit test found it. Direct evidence for the extraction being worth it.
+- A second latent bug from the same refactor: `mode` was defaulted to "strict" before reaching `resolveGatePolicy`, which would have made `posture: "advisory"` silently unreachable. Order of resolution matters — posture first, then read `mode` off it.
+- `\Z` is Python, not JavaScript. In a JS regex it degrades to a literal "Z" with no error, so my correct-usage section extractor failed closed and let the inverted seed through on first attempt. Silent-degradation class, worth watching for.
+- Parallel vitest forks cannot be enabled here: vitest 2.1.9 resolves worker paths through a URL and collects ZERO tests when the checkout path contains a space (".../New idea"). Recorded with a validated block sensor.
+- The seed generator's failure modes are broader than inversion: the seed it proposed for the vitest lesson (`poolOptions\.forks\.singleFork\s*:\s*false`) would have been a DEAD sensor — that literal text never appears in the file. Inversion is now guarded; deadness is not, and cannot be without a bad example.
 
 ## Files touched
+- `packages/core/src/gate-verdict.ts`
+- `packages/core/test/gate-verdict.test.ts`
 - `packages/cli/src/commands/enforce.ts`
-- `packages/cli/src/commands/init.ts`
-- `packages/cli/src/commands/stats.ts`
-- `packages/cli/src/commands/bridges.ts`
-- `packages/core/src/code-map.ts`
-- `packages/core/src/prevention.ts`
-- `packages/core/src/sensors.ts`
-- `packages/core/src/gate-reminder.ts`
-- `packages/mcp/src/embeddings-runtime.ts`
-- `packages/github-action/tsup.config.ts`
+- `packages/cli/src/commands/doctor.ts`
+- `packages/core/src/config.ts`
+- `packages/core/src/sensor-suggest.ts`
+- `packages/cli/test/generated-artifacts.test.ts`
+- `packages/cli/vitest.config.ts`
 
 ## Next steps
-- Glama: Sync Server + a new release so the score re-grades against 15 tools (still shows 13 / v0.1.0).
-- Consider arming a `kind: test` sensor on the action bundle lesson once `runCommandSensors` is on; CI already enforces it deterministically.
-- §4.3 (active memory decay) and §4.5 (receipt distinguishing bypassed / false-positive from prevented) are the two field-report items deliberately left for a later pass.
+- A dead-sensor guard for seeds would need a bad example the generator does not have; the honest options are to mine one from the fix diff (`sensors propose --from-fix` already does this) or to leave it to `propose_sensor`.
+- `doctor.ts` (1493 lines), `mcp/server.ts` (1399) and `get-briefing.ts` (1090) are the next monoliths; same treatment as enforce.ts if they start accreting conditional passes.
+- Still open from the field report: §4.3 active memory decay, §4.5 receipt distinguishing bypassed / false-positive from prevented.

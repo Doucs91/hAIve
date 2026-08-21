@@ -24,6 +24,14 @@ import {
   loadConfig,
   detectAgentContext,
   loadMemoriesFromDir,
+  buildBaselineHealthFinding,
+  computeBaselineHealth,
+  decideVerdict,
+  dedupeRefusals,
+  describePosture,
+  resolveGatePolicy,
+  CONTENT_CATCH_CODES,
+  SETUP_GATE_CODES,
   shouldExpandGateReminder,
   recordGateReminder,
   loadSensorLedger,
@@ -46,6 +54,7 @@ import {
   type LoadedMemory,
   type HaiveConfig,
 } from "@hivelore/core";
+import type { GateFinding, BaselineHealth } from "@hivelore/core";
 import { astEngineAvailable, getBriefing, preCommitCheck, runAstSensorOnContent } from "@hivelore/mcp";
 import { ui } from "../utils/ui.js";
 import { installClaudeHooksAtPath, uninstallClaudeHooksAtPath, defaultClaudeSettingsPath } from "../utils/claude-hooks.js";
@@ -138,42 +147,12 @@ interface FinishOptions {
   waitTimeout?: string;
 }
 
-interface EnforcementFinding {
-  severity: "ok" | "info" | "warn" | "error";
-  code: string;
-  message: string;
-  fix?: string;
-  impact?: number;
-  reason?: string;
-  affected_files?: string[];
-  memory_ids?: string[];
-  /** Project-relative file a deterministic finding fired on, when one is known. */
-  file?: string;
-  /**
-   * Collapsed rendering for a repeated advisory. The gate's teaching text (the bootstrap checklist)
-   * is worth six lines the first time and wallpaper the fiftieth; when set, human output prints this
-   * instead. `message` is always the complete text, so --json and --explain are unaffected.
-   */
-  short_message?: string;
-  /**
-   * The exact source line that matched. This is what makes a refusal actionable: "score 40%" gives
-   * a developer nothing to change, the offending line gives them everything. The scan runs over the
-   * ADDED lines of the diff, so a numeric index into it would not be the file's line number — the
-   * text is reported instead, which is both correct and easier to locate.
-   */
-  matched_line?: string;
-}
-
-interface EnforcementScore {
-  score: number;
-  threshold: number;
-  checks: {
-    total: number;
-    ok: number;
-    warn: number;
-    error: number;
-  };
-}
+/**
+ * Shape of a gate finding. Defined in `@hivelore/core` (gate-verdict.ts) alongside the decision
+ * logic that consumes it; aliased here so the command file reads the same as before.
+ */
+type EnforcementFinding = GateFinding;
+type EnforcementScore = BaselineHealth;
 
 interface EnforcementReport {
   root: string;
@@ -181,6 +160,8 @@ interface EnforcementReport {
   mode: "off" | "advisory" | "strict";
   /** Who this run binds: "agent (…signals)" or "human — …". Absent for early-exit reports. */
   actor?: string;
+  /** Effective gate posture and any explicit overrides — see `describePosture`. */
+  posture?: string;
   score: EnforcementScore;
   should_block: boolean;
   findings: EnforcementFinding[];
@@ -616,7 +597,10 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
   const paths = resolveHaivePaths(root);
   const initialized = existsSync(paths.haiveDir);
   const config = initialized ? await loadConfig(paths) : {};
-  const mode = config.enforcement?.mode ?? "strict";
+  // Resolve the posture FIRST: `mode` is one of the switches a posture supplies, so defaulting it
+  // to "strict" before asking the policy would make enforcement.posture="advisory" unreachable.
+  const gatePolicy = resolveGatePolicy(config.enforcement);
+  const mode = gatePolicy.mode;
   const findings: EnforcementFinding[] = [];
 
   if (!initialized) {
@@ -1160,7 +1144,9 @@ async function buildEnforcementReport(
     // push (decision 2026-06-02-decision-atomic-release-commit-and-skip-ci-tip).
     if (stage === "pre-commit") await stageResyncedArtifacts(root, paths);
   }
-  const mode = config.enforcement?.mode ?? "strict";
+  // Same rule as buildFinishReport: resolve the posture before reading `mode` off it.
+  const gatePolicy = resolveGatePolicy(config.enforcement);
+  const mode = gatePolicy.mode;
   const findings: EnforcementFinding[] = [];
 
   if (!initialized) {
@@ -1264,120 +1250,39 @@ async function buildEnforcementReport(
     ...await checkBootstrapComplete(paths, config, changedFiles.some(looksLikeProductionCode), stage),
   );
 
-  // PROCESS gates bind the agent workflow ("consult team knowledge before changing code");
-  // a human committing by hand is the trusted author of that knowledge. When no agent harness
-  // is detected (env signals — see detectAgentContext) and humanCommits=relaxed (default),
-  // downgrade process-gate errors to warnings. DETERMINISTIC findings (sensor-block,
-  // precommit-policy-block, stale anchors, artifacts) are about the code, not the workflow —
-  // they are never relaxed. CI is excluded: it validates the merged result for everyone.
+  // ── Verdict ────────────────────────────────────────────────────────────
+  // One pass, in `core/gate-verdict.ts`. This used to be three sequential downgrade transforms
+  // stacked here, each added by a different fix and none aware of the others, so the outcome
+  // depended on their order and nobody could state the rule. Everything below is now orchestration.
   const agentContext = detectAgentContext();
-  const relaxForHuman =
-    stage !== "ci" &&
-    !agentContext.agent &&
-    (config.enforcement?.humanCommits ?? "relaxed") === "relaxed";
-  let effectiveFindings = findings;
-  if (relaxForHuman) {
-    effectiveFindings = findings.map((f) =>
-      f.severity === "error" && PROCESS_GATE_CODES.has(f.code)
-        ? {
-            ...f,
-            severity: "warn" as const,
-            impact: 5,
-            message:
-              `${f.message} (relaxed to a warning: no agent harness detected, so this human commit ` +
-              `is not bound by agent process gates — set enforcement.humanCommits="strict" to change that)`,
-          }
-        : f,
-    );
-  }
-
-  // PROCESS gates are advisory EVERYWHERE by default (enforcement.processGate, v0.55.0). The gate
-  // spends its refusals only where it has deterministic, code-bound evidence; "you did not write a
-  // session recap" is a request, not a verdict on the diff. Set processGate:"block" for the old
-  // behaviour. See the config doc-comment for the field evidence behind the default.
-  if ((config.enforcement?.processGate ?? "warn") === "warn") {
-    effectiveFindings = effectiveFindings.map((f) =>
-      f.severity === "error" && PROCESS_GATE_CODES.has(f.code)
-        ? {
-            ...f,
-            severity: "warn" as const,
-            impact: Math.min(f.impact ?? 8, 8),
-            message:
-              `${f.message} (advisory: process gates report, they do not refuse — only sensors and ` +
-              `other deterministic findings block. Set enforcement.processGate="block" to change that.)`,
-          }
-        : f,
-    );
-  }
-
-  // At COMMIT time, PROCESS/STATE gates are advisory — only DETERMINISTIC content findings
-  // (sensor-block, precommit-policy-block, stale anchors, generated artifacts) may block a local
-  // commit. The process gates (briefing loaded, session recap, decision coverage, bootstrap) bind the
-  // SHARING points (pre-push, ci), where the code leaves the machine and other agents rely on it.
-  // Blocking these at every pre-commit trained the `--no-verify` reflex on cold/iterating repos —
-  // and a gate routinely bypassed protects nothing. This never weakens "same diff, same verdict":
-  // the content checks are untouched, and everything still enforces before the code is shared.
-  const commitStage = stage === "pre-commit" || stage === "local";
-  if (commitStage) {
-    effectiveFindings = effectiveFindings.map((f) =>
-      f.severity === "error" && PROCESS_GATE_CODES.has(f.code)
-        ? { ...f, severity: "warn" as const, impact: Math.min(f.impact ?? 8, 8) }
-        : f,
-    );
-  }
-
-  const score = buildScore(effectiveFindings, config.enforcement?.scoreThreshold);
-  // A composite score is a MEASUREMENT, not a verdict. It used to be its own blocking finding, so a
-  // push could be refused with "Enforcement score 40% is below required threshold 85%" while every
-  // penalty behind that number was a process gate and the diff itself was clean. That sentence tells
-  // a developer nothing they can act on, and the number moved for reasons unrelated to their change.
-  //
-  // The verdict now comes from the findings themselves — a block sensor names its pattern and the
-  // `file:line` it fired on. The score is still computed, still reported, and still says what is
-  // dragging it down, but it no longer refuses anything on its own: if nothing deterministic fired,
-  // there is nothing to refuse.
-  // ...and it is suppressed entirely when something DID refuse. When a documented lesson refuses a
-  // change, that lesson is the message; appending "score 2% — top penalties: …" underneath buries
-  // the one line the developer needs to act on.
-  const refused = effectiveFindings.some((f) => f.severity === "error");
-  if (score.score < score.threshold && !refused) {
-    const topPenalties = effectiveFindings
-      .map((f) => ({
-        code: f.code,
-        penalty: f.severity === "error" ? (f.impact ?? 25) : f.severity === "warn" ? (f.impact ?? 8) : 0,
-      }))
-      .filter((p) => p.penalty > 0)
-      .sort((a, b) => b.penalty - a.penalty)
-      .slice(0, 3);
-    effectiveFindings = [...effectiveFindings, {
-      severity: "warn",
-      code: "enforcement-score-below-threshold",
-      message:
-        `Enforcement score ${score.score}% is below the ${score.threshold}% target` +
-        (topPenalties.length > 0
-          ? ` — top penalties: ${topPenalties.map((p) => `${p.code} (−${p.penalty})`).join(", ")}`
-          : "") + ". This is a health measurement; it does not block on its own.",
-      fix: "Address the findings above, then rerun `hivelore enforce check`.",
-      impact: 0,
-    }];
-  }
+  const policy = gatePolicy;
+  const verdict = decideVerdict({
+    findings,
+    policy,
+    stage,
+    isAgent: agentContext.agent,
+    agentSignals: agentContext.signals,
+  });
+  let effectiveFindings = verdict.findings;
+  const healthFinding = buildBaselineHealthFinding(
+    effectiveFindings,
+    verdict.baseline_health,
+    verdict.should_block,
+  );
+  if (healthFinding) effectiveFindings = [...effectiveFindings, healthFinding];
 
   // Collapse an advisory reminder that has already been shown in full today. The finding, its
   // severity and its fix are untouched — only how much of it a human sees again.
   effectiveFindings = await collapseRepeatedReminders(paths, effectiveFindings);
 
-  const hasErrors = effectiveFindings.some((f) => f.severity === "error");
   const report = withCategories({
     root,
     initialized,
     mode,
-    actor: agentContext.agent
-      ? `agent (${agentContext.signals.join(", ")})`
-      : relaxForHuman
-        ? "human — process gates relaxed"
-        : "human — strict (enforcement.humanCommits)",
-    score: buildScore(effectiveFindings, config.enforcement?.scoreThreshold),
-    should_block: mode === "strict" && hasErrors,
+    actor: verdict.actor,
+    posture: describePosture(policy),
+    score: computeBaselineHealth(effectiveFindings, policy.scoreThreshold),
+    should_block: verdict.should_block,
     findings: effectiveFindings,
   });
   if (!report.should_block && (stage === "pre-commit" || stage === "ci")) {
@@ -2819,23 +2724,13 @@ async function collapseRepeatedReminders(
   return out;
 }
 
+/**
+ * Kept as the shim the early-exit report paths use (not-initialized, enforcement-off, finish).
+ * The real computation lives in `core/gate-verdict.ts` so there is exactly one definition of the
+ * number and it cannot drift between the two call paths.
+ */
 function buildScore(findings: EnforcementFinding[], threshold = 80): EnforcementScore {
-  const checks = {
-    total: findings.length,
-    ok: findings.filter((f) => f.severity === "ok").length,
-    warn: findings.filter((f) => f.severity === "warn").length,
-    error: findings.filter((f) => f.severity === "error").length,
-  };
-  const penalty = findings.reduce((sum, f) => {
-    if (f.severity === "error") return sum + (f.impact ?? 25);
-    if (f.severity === "warn") return sum + (f.impact ?? 8);
-    return sum;
-  }, 0);
-  return {
-    score: Math.max(0, Math.min(100, 100 - penalty)),
-    threshold,
-    checks,
-  };
+  return computeBaselineHealth(findings, threshold);
 }
 
 /** The managed git hooks Hivelore owns, as `{ name, body }` — the single source of truth reused by
@@ -3022,28 +2917,23 @@ jobs:
 }
 
 /**
- * PROCESS gates: they describe the AGENT WORKFLOW around the change ("was team knowledge consulted?",
- * "was the session recapped?"), never the change itself. Deterministic, code-bound findings live in
- * CONTENT_CATCH_CODES below and are the only ones allowed to refuse by default.
+ * The part of a refusal worth reading, once the bullet has already named the lesson and the file.
+ *
+ * Finding messages are written to stand alone in a flat list ("Block sensor fired — <id>: <lesson>
+ * (<file>)"), so rendering one under a bullet that already carries the id and the file printed both
+ * twice. The bullet is the identity; this is the lesson.
  */
-const PROCESS_GATE_CODES = new Set([
-  "briefing-missing",
-  "session-recap-missing",
-  "decision-coverage-missing",
-  "bootstrap-incomplete",
-]);
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
-// The deterministic "your diff repeated a documented lesson" catches — the signal a developer most
-// needs surfaced first, distinct from setup/baseline gates about the repo's own knowledge layer.
-const CONTENT_CATCH_CODES = new Set(["sensor-block", "precommit-policy-block"]);
-// Setup/baseline gates — about the repo's knowledge layer being cold, NOT the change just made.
-const SETUP_GATE_CODES = new Set([
-  "briefing-missing",
-  "session-recap-missing",
-  "decision-coverage-missing",
-  "bootstrap-incomplete",
-  "enforcement-score-below-threshold",
-]);
+function refusalSummary(finding: EnforcementFinding, id: string): string {
+  let text = finding.message.split("\n")[0] ?? "";
+  // Drop the leading "<what fired> — <id>:" preamble the flat-list format needs.
+  text = text.replace(new RegExp(`^.*?—\\s*${escapeRegExp(id)}\\s*:\\s*`), "");
+  if (finding.file) text = text.replace(` (${finding.file})`, "");
+  return text.replace(new RegExp(escapeRegExp(id), "g"), "").replace(/\s{2,}/g, " ").trim() || finding.code;
+}
 
 /**
  * When the gate blocks, lead with WHY in one line so the two very different failures never blur:
@@ -3054,13 +2944,18 @@ const SETUP_GATE_CODES = new Set([
 function printBlockHeadline(report: EnforcementReport): void {
   const blocking = report.categories?.blocking ?? report.findings.filter((f) => f.severity === "error");
   if (blocking.length === 0) return;
-  const catches = blocking.filter((f) => CONTENT_CATCH_CODES.has(f.code));
+  // One lesson, one line. The anti-pattern matcher and the sensor runner both legitimately fire on
+  // the same memory, and reporting them separately turned a single bad line into four lines of
+  // output at exactly the moment attention is most worth spending.
+  const catches = dedupeRefusals(blocking);
   console.log();
   if (catches.length > 0) {
     console.log(ui.red(ui.bold("🛡️  A documented lesson refused this commit — about the change you just made:")));
     for (const c of catches) {
       const id = c.memory_ids?.[0] ?? c.code;
-      console.log(`    ${ui.red("•")} ${ui.bold(id)}  ${c.message.split("\n")[0]}`);
+      const where = c.file ? ui.dim(` (${c.file})`) : "";
+      console.log(`    ${ui.red("•")} ${ui.bold(id)}${where}  ${refusalSummary(c, id)}`);
+      if (c.matched_line) console.log(`      ${ui.dim(c.matched_line)}`);
     }
   } else if (blocking.every((f) => SETUP_GATE_CODES.has(f.code))) {
     console.log(ui.yellow(ui.bold("⚙  Setup gate — about your repo's baseline, not the change you just made.")));
@@ -3086,7 +2981,10 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
 
   console.log(ui.bold(`Hivelore enforcement — ${report.mode}${report.actor ? ` · ${report.actor}` : ""}`));
   console.log(ui.dim(`  root: ${report.root}`));
-  console.log(ui.dim(`  score: ${report.score.score}% / threshold ${report.score.threshold}%`));
+  // Name what the number measures. "score: 40%" invited the reading "your change is 40% good";
+  // it has only ever described the repo's standing knowledge layer.
+  console.log(ui.dim(`  knowledge-layer health: ${report.score.score}% (target ${report.score.threshold}%)`));
+  if (explain && report.posture) console.log(ui.dim(`  posture: ${report.posture}`));
 
   if (report.should_block) printBlockHeadline(report);
 
@@ -3095,8 +2993,21 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
     printFindingGroup("Review", report.categories.review, "warn");
     printFindingGroup("Info", report.categories.info, "info");
   } else if (quiet) {
-    // Show only what needs action; drop the reassuring ✓/• noise (the passing checks).
-    for (const finding of actionable) printFinding(finding);
+    // Show only what needs action; drop the reassuring ✓/• noise (the passing checks). When the
+    // headline already named a refusal, do not print the same memory again underneath it.
+    // Keyed by MEMORY, not by code: the anti-pattern matcher and the sensor runner report the same
+    // lesson under two different codes, so keying on the code would still print it twice.
+    const named = new Set(
+      report.should_block
+        ? dedupeRefusals(report.findings).flatMap((f) => f.memory_ids ?? []).filter(Boolean)
+        : [],
+    );
+    for (const finding of actionable) {
+      const isNamedRefusal =
+        CONTENT_CATCH_CODES.has(finding.code) && (finding.memory_ids ?? []).some((id) => named.has(id));
+      if (isNamedRefusal) continue;
+      printFinding(finding);
+    }
   } else {
     for (const finding of report.findings) printFinding(finding);
   }

@@ -130,7 +130,59 @@ export function suggestSensorSeed(
     message: companion ? companionMessage(body, companion) : sensorMessageFromBody(body, token),
   };
   if (companion) seed.absent = escapeRegExp(companion.required);
-  return seed;
+  // Final gate: the lesson carries its own counter-example, so test against it before emitting.
+  return seedFiresOnCorrectUsage(seed, body) ? null : seed;
+}
+
+/**
+ * Does this candidate match the lesson's OWN description of correct usage?
+ *
+ * The heuristics above avoid the inverted-seed class token by token; this checks the finished
+ * pattern against the text, which is the only way to catch a token that was innocent in isolation.
+ * Observed three times in the field: a lesson about bundling a GitHub Action produced the seed
+ * `uses\s*:\s*["']?Doucs91`, lifted from the very line that shows how to consume the action
+ * CORRECTLY. `propose_sensor` would have rejected it, so nothing unsafe could ever be armed — but a
+ * visibly absurd first suggestion teaches agents to stop reading the loop, and the sensor loop is
+ * the most valuable thing Hivelore does. No seed is strictly better than an inverted seed.
+ *
+ * Deliberately not routed through `judgeProposedSensor`: seeds are `warn`, and that function accepts
+ * every warn sensor by design. The inversion check has to be explicit here.
+ */
+function seedFiresOnCorrectUsage(seed: SensorSeed, body: string): boolean {
+  const correct = correctUsageText(body);
+  if (!correct) return false;
+  let re: RegExp;
+  try {
+    re = new RegExp(seed.pattern, "m");
+  } catch {
+    return true; // an uncompilable pattern is not worth proposing either
+  }
+  if (!re.test(correct)) return false;
+  // A discriminating sensor is allowed to match correct usage as long as its `absent` companion is
+  // there too — that is exactly what makes it discriminate rather than fire on everything.
+  if (seed.absent) {
+    try {
+      if (new RegExp(seed.absent, "m").test(correct)) return false;
+    } catch { /* fall through: treat as inverted */ }
+  }
+  return true;
+}
+
+/**
+ * The parts of a memory body that describe what you SHOULD do. Broader than
+ * `extractCorrectApproachExamples` (which reads the structured `Instead, use:` field) because
+ * free-form lessons put the recommendation under headings like "How to apply" or "Fix", and fenced
+ * code blocks there are the clearest statement of correct usage a lesson ever contains.
+ */
+function correctUsageText(body: string): string {
+  const parts = [...extractCorrectApproachExamples(body)];
+  // NB: end-of-input is `(?![\s\S])` — `\Z` is Python, and in JS silently degrades to a literal "Z",
+  // which made the whole section capture fail closed and let inverted seeds through.
+  const headingRe = /^#{1,6}\s+(?:how to apply|instead|correct|the fix|fix|recommended|do this|guidance)\b[^\n]*\n([\s\S]*?)(?=^#{1,6}\s|(?![\s\S]))/gim;
+  for (const match of body.matchAll(headingRe)) {
+    if (match[1]) parts.push(match[1]);
+  }
+  return parts.join("\n").trim();
 }
 
 /**

@@ -174,6 +174,26 @@ export interface HaiveConfig {
    * treat Hivelore as infrastructure, not an optional convention.
    */
   enforcement?: {
+    /**
+     * ONE knob that decides whether the gate refuses, and for whom. Pick this; leave the rest alone.
+     *
+     *   - "advisory" — reports everything, refuses nothing. For adopting Hivelore on a live repo.
+     *   - "balanced" (default) — refuses only on deterministic, code-bound findings: block sensors,
+     *     anti-pattern blocks, stale anchors on files the change touches, artifact hygiene.
+     *   - "strict"   — the above, plus process gates (briefing, session recap, decision coverage,
+     *     bootstrap) refusing at the sharing points (pre-push, CI) for agents and humans alike.
+     *
+     * `mode`, `processGate` and `humanCommits` below are the individual switches the posture sets;
+     * setting one explicitly overrides the posture for that switch only. This field exists because
+     * this object had grown to two dozen interacting knobs and the resulting verdict could not be
+     * predicted from the config by anyone, including the people who wrote it. `hivelore doctor`
+     * prints the effective posture and any overrides.
+     *
+     * One rule is not a posture knob and is not negotiable: process gates never refuse a local
+     * commit, at any posture. Blocking them on every pre-commit is what trained the `--no-verify`
+     * reflex on cold repos, and a bypassed gate protects nothing.
+     */
+    posture?: "advisory" | "balanced" | "strict";
     /** Enforcement posture: advisory reports only, warn in hooks, or block workflow gates. */
     mode?: "off" | "advisory" | "strict";
     /** Require get_briefing / mem_relevant_to before state-changing MCP tools. */

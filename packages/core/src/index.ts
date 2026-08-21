@@ -10,6 +10,7 @@ export * from "./impact.js";
 export * from "./prevention.js";
 export * from "./context-throttle.js";
 export * from "./gate-reminder.js";
+export * from "./gate-verdict.js";
 export * from "./eval.js";
 export * from "./confidence.js";
 export * from "./relevance.js";

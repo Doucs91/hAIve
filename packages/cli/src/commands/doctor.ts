@@ -28,6 +28,8 @@ import {
   isStackPackSeed,
   loadCodeMap,
   loadConfig,
+  resolveGatePolicy,
+  describePosture,
   loadMemoriesFromDirDetailed,
   loadSensorLedger,
   loadUsageIndex,
@@ -352,6 +354,22 @@ export function registerDoctor(program: Command): void {
           code: "memory-brittle-sensors",
           message: `${brittleSensors} sensor(s) look brittle (hardcoded line numbers/literals) — they won't hard-block and may not fire on real diffs.`,
           fix: "hivelore sensors list   # review the ⚠ brittle entries, then rewrite or retire them",
+        });
+      }
+
+      // State the effective gate posture out loud. Two dozen enforcement switches interact, and a
+      // developer who cannot predict what the gate will refuse stops trusting it. One line, always
+      // shown, naming the posture, what it does, and anything pinned on top of it.
+      {
+        const policy = resolveGatePolicy(config.enforcement);
+        findings.push({
+          severity: "info",
+          code: "enforcement-posture",
+          message: `Gate posture: ${describePosture(policy)}.`,
+          fix:
+            policy.posture === "balanced"
+              ? undefined
+              : 'Set enforcement.posture to "advisory" | "balanced" | "strict" in .ai/hivelore.config.json.',
         });
       }
 

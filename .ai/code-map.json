@@ -98,26 +98,26 @@
         {
           "name": "Finding",
           "kind": "interface",
-          "line": 64
+          "line": 66
         },
         {
           "name": "registerDoctor",
           "kind": "function",
-          "line": 84
+          "line": 86
         },
         {
           "name": "isCodeMapNearEmpty",
           "kind": "function",
           "description": "Reserve \"near empty\" for catastrophic misses, not files that legitimately expose no symbols.",
-          "line": 733
+          "line": 751
         },
         {
           "name": "mcpRuntimeVersionFinding",
           "kind": "function",
-          "line": 743
+          "line": 761
         }
       ],
-      "loc": 1494
+      "loc": 1512
     },
     "packages/cli/src/commands/embeddings.ts": {
       "exports": [
@@ -141,61 +141,61 @@
           "name": "stripHiveloreHookBlock",
           "kind": "function",
           "description": "Remove every Hivelore-owned block from a git-hook script, in BOTH the current and the legacy (`# hAIve enforcement hook` → direct `haive …` call) shapes, returning only foreign content.",
-          "line": 78
+          "line": 87
         },
         {
           "name": "buildHookFileContent",
           "kind": "function",
           "description": "Idempotent hook content: our block wholesale when the file is ours (or empty), else the preserved foreign script followed by our block (a genuine husky/custom hook is never clobbered).",
-          "line": 100
+          "line": 109
         },
         {
           "name": "registerEnforce",
           "kind": "function",
-          "line": 194
+          "line": 175
         },
         {
           "name": "runWithEnforcement",
           "kind": "function",
-          "line": 941
+          "line": 925
         },
         {
           "name": "parseSensorWeakeningApprovals",
           "kind": "function",
           "description": "Parse auditable sensor-change approvals from an env value or commit-message trailer block.",
-          "line": 1776
+          "line": 1681
         },
         {
           "name": "managedGitHookSpecs",
           "kind": "function",
           "description": "The managed git hooks Hivelore owns, as `{ name, body }` — the single source of truth reused by install AND the doctor self-heal path, so they can never drift apart.",
-          "line": 2843
+          "line": 2738
         },
         {
           "name": "hookIsStale",
           "kind": "function",
           "description": "A managed hook is BROKEN (not merely absent) when it still calls the removed `haive` binary directly, or carries a duplicated block (>1 marker / >1 shebang — the artifact the pre-v0.52.1 installer produced).",
-          "line": 2869
+          "line": 2764
         },
         {
           "name": "detectStaleGitHooks",
           "kind": "function",
           "description": "Names of managed hooks that exist and are BROKEN (legacy `haive` call or duplicated block).",
-          "line": 2878
+          "line": 2773
         },
         {
           "name": "repairStaleGitHooks",
           "kind": "function",
           "description": "Detect + REPAIR broken managed hooks in `.git/hooks`.",
-          "line": 2896
+          "line": 2791
         },
         {
           "name": "renderCiEnforcementWorkflow",
           "kind": "function",
-          "line": 2965
+          "line": 2860
         }
       ],
-      "loc": 3329
+      "loc": 3240
     },
     "packages/cli/src/commands/eval.ts": {
       "exports": [
@@ -1126,7 +1126,7 @@
           "line": 11
         }
       ],
-      "loc": 24
+      "loc": 33
     },
     "packages/core/src/agent-context.ts": {
       "summary": "Detect whether the current process runs inside an AI coding-agent harness.",
@@ -1562,59 +1562,59 @@
           "name": "DEFAULT_BRIEFING_EXCLUDE_TAGS",
           "kind": "const",
           "description": "Tags excluded from automatic briefing surfacing by default.",
-          "line": 327
+          "line": 347
         },
         {
           "name": "DEFAULT_CONFIG",
           "kind": "const",
-          "line": 335
+          "line": 355
         },
         {
           "name": "AUTOPILOT_DEFAULTS",
           "kind": "const",
-          "line": 372
+          "line": 392
         },
         {
           "name": "AntiPatternGate",
           "kind": "type",
           "description": "The pre-commit anti-pattern gate hardness levels.",
-          "line": 410
+          "line": 430
         },
         {
           "name": "antiPatternGateParams",
           "kind": "function",
           "description": "Single source of truth mapping a configured `antiPatternGate` to the `pre_commit_check` parameters that implement it.",
-          "line": 418
+          "line": 438
         },
         {
           "name": "configPath",
           "kind": "function",
           "description": "The canonical config path to WRITE to (the current name).",
-          "line": 435
+          "line": 455
         },
         {
           "name": "resolveConfigPath",
           "kind": "function",
           "description": "Path to READ from: the current file if present, else the legacy `haive.config.json`, else current.",
-          "line": 440
+          "line": 460
         },
         {
           "name": "loadConfig",
           "kind": "function",
-          "line": 447
+          "line": 467
         },
         {
           "name": "loadConfigSync",
           "kind": "function",
-          "line": 464
+          "line": 484
         },
         {
           "name": "saveConfig",
           "kind": "function",
-          "line": 478
+          "line": 498
         }
       ],
-      "loc": 501
+      "loc": 521
     },
     "packages/core/src/conflict-candidates.ts": {
       "exports": [
@@ -2586,6 +2586,118 @@
       ],
       "loc": 68
     },
+    "packages/core/src/gate-verdict.ts": {
+      "summary": "The gate's decision layer — pure, and the only place that decides what refuses.",
+      "exports": [
+        {
+          "name": "GateSeverity",
+          "kind": "type",
+          "description": "Severity as reported by a gate check, before policy is applied.",
+          "line": 20
+        },
+        {
+          "name": "GateFinding",
+          "kind": "interface",
+          "line": 22
+        },
+        {
+          "name": "GateStage",
+          "kind": "type",
+          "line": 39
+        },
+        {
+          "name": "PROCESS_GATE_CODES",
+          "kind": "const",
+          "description": "PROCESS gates describe the AGENT WORKFLOW around a change — \"was team knowledge consulted?\", \"was the session recapped?\" — never the change itself.",
+          "line": 45
+        },
+        {
+          "name": "CONTENT_CATCH_CODES",
+          "kind": "const",
+          "description": "CONTENT catches are deterministic statements about THIS diff: a documented lesson matched the code being committed.",
+          "line": 56
+        },
+        {
+          "name": "SETUP_GATE_CODES",
+          "kind": "const",
+          "description": "Setup/baseline gates — about the repo's knowledge layer being cold, not the change just made.",
+          "line": 62
+        },
+        {
+          "name": "GatePosture",
+          "kind": "type",
+          "description": "A named posture, so a team picks ONE thing instead of reasoning about how two dozen independent switches interact.",
+          "line": 74
+        },
+        {
+          "name": "DEFAULT_POSTURE",
+          "kind": "const",
+          "line": 76
+        },
+        {
+          "name": "GatePolicyInput",
+          "kind": "interface",
+          "line": 78
+        },
+        {
+          "name": "GatePolicy",
+          "kind": "interface",
+          "line": 86
+        },
+        {
+          "name": "resolveGatePolicy",
+          "kind": "function",
+          "line": 105
+        },
+        {
+          "name": "describePosture",
+          "kind": "function",
+          "description": "One sentence describing what a posture actually does, for `doctor` and `--explain`.",
+          "line": 124
+        },
+        {
+          "name": "GateVerdictInput",
+          "kind": "interface",
+          "description": "── The single decision pass ─────────────────────────────────────────────────",
+          "line": 137
+        },
+        {
+          "name": "BaselineHealth",
+          "kind": "interface",
+          "line": 147
+        },
+        {
+          "name": "GateVerdict",
+          "kind": "interface",
+          "line": 158
+        },
+        {
+          "name": "computeBaselineHealth",
+          "kind": "function",
+          "description": "Baseline health, computed from the repo's STANDING STATE only.",
+          "line": 228
+        },
+        {
+          "name": "dedupeRefusals",
+          "kind": "function",
+          "description": "Collapse content catches so one lesson is reported once.",
+          "line": 252
+        },
+        {
+          "name": "decideVerdict",
+          "kind": "function",
+          "description": "Decide the whole verdict in one pass.",
+          "line": 272
+        },
+        {
+          "name": "buildBaselineHealthFinding",
+          "kind": "function",
+          "description": "The health finding, emitted only when it is worth reading: below target, and nothing else refused.",
+          "line": 313
+        }
+      ],
+      "loc": 338
+    },
     "packages/core/src/handoff.ts": {
       "summary": "Ephemeral session handoff — a single, overwritten `NEXT.md` at the repo root.",
       "exports": [
@@ -3501,16 +3613,16 @@
           "name": "suggestSensorFromMemory",
           "kind": "function",
           "description": "@deprecated The agent-in-the-loop write paths no longer persist heuristic sensors — they surface a {@link SensorSeed} for `propose_sensor` to validate instead.",
-          "line": 143
+          "line": 195
         },
         {
           "name": "mineSensorSeedFromDiff",
           "kind": "function",
           "description": "The strongest possible seed: mine it from the FIX itself.",
-          "line": 173
+          "line": 225
         }
       ],
-      "loc": 440
+      "loc": 492
     },
     "packages/core/src/sensors.ts": {
       "exports": [

@@ -1799,8 +1799,15 @@ describe("Hivelore CLI integration", () => {
       expect(caught.stdout).toContain("2024-02-02-attempt-no-moment");
       // The deterministic block is named; at COMMIT stage the process/score noise is suppressed
       // (Lever: silence-on-success / commit-advisory) so the lesson-refusal is the signal, not buried.
-      expect(caught.stdout).toContain("sensor-block");
+      // The headline names the LESSON, the file, and the offending line — not a code and not a score.
+      expect(caught.stdout).toContain("A documented lesson refused this commit");
+      expect(caught.stdout).toContain("2024-02-02-attempt-no-moment");
+      expect(caught.stdout).toContain("src/d.ts");
       expect(caught.stdout).not.toContain("top penalties:");
+      // ONE lesson, ONE mention. The anti-pattern matcher and the sensor runner both fire on this
+      // memory; reporting them separately turned a single bad line into four lines of output.
+      const mentions = caught.stdout.split("2024-02-02-attempt-no-moment").length - 1;
+      expect(mentions, `lesson mentioned ${mentions}x:\n${caught.stdout}`).toBe(1);
     } finally {
       await rm(repo, { recursive: true, force: true });
     }

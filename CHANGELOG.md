@@ -6,6 +6,90 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.56.0] — Making the existing parts excellent: one decision rule, one posture, one line per refusal
+
+No new capability. Six things Hivelore already did, done properly — each one chosen from friction
+observed while working in this repository, not from a wish list.
+
+### The gate has ONE decision rule, and it lives in core
+
+`enforce.ts` held **three separate downgrade passes** over the same process-gate codes, applied one
+after another. Each arrived with a different bug fix; none knew about the others. The verdict
+therefore depended on their execution order, which was written down nowhere, and adding a fourth was
+the obvious way to fix the next report.
+
+There is now one pass, in `packages/core/src/gate-verdict.ts` (`decideVerdict`), pure and free of
+filesystem and git. It paid for itself immediately: extracting the rule exposed a regression the
+rewrite had introduced — the human carve-out was being applied in CI, where it must never apply,
+because CI validates the merged result on everyone's behalf. A unit test caught it before release.
+
+The rule now reads in one breath: **process gates refuse only when the repo asked for it, only at a
+sharing point, and only for whoever they are meant to bind.** One clause is not a knob and is not
+negotiable: they never refuse a local commit, at any posture.
+
+### One posture instead of two dozen interacting switches
+
+`enforcement` had grown to twenty-four independent knobs whose combined verdict nobody could predict
+— including the people who wrote them. New **`enforcement.posture`**: `advisory` (reports, never
+refuses), **`balanced`** (default — refuses on deterministic, code-bound findings only), `strict`
+(process gates bind at pre-push and CI too). The individual switches still win when set explicitly,
+and `hivelore doctor` now always prints the effective posture plus any overrides.
+
+### A refusal is one line about one lesson
+
+The anti-pattern matcher and the sensor runner both legitimately fire on the same memory. Reported
+separately, a single bad line produced **four lines of output** — twice in the headline, twice in
+the findings list — at exactly the moment attention is most worth spending.
+
+```
+- 🛡️  A documented lesson refused this commit:
+-     • 2024-02-02-attempt-no-moment  Pre-commit policy matched 1 blocking anti-pattern(s), 0 stale…
+-     • 2024-02-02-attempt-no-moment  Block sensor fired — 2024-02-02-attempt-no-moment: Use date-fns…
+- ✗ precommit-policy-block: Pre-commit policy matched 1 blocking anti-pattern(s)…
+- ✗ sensor-block: Block sensor fired — 2024-02-02-attempt-no-moment: Use date-fns, not moment. (src/d.ts)
++ 🛡️  A documented lesson refused this commit:
++     • 2024-02-02-attempt-no-moment (src/d.ts)  Use date-fns, not moment.
++       import moment from 'moment';
+```
+
+### The score measures one thing, and says which
+
+It summed penalties from the repo's cold knowledge layer AND from the diff under review. One number,
+two meanings, so no trend in it could be acted on. It is now **knowledge-layer health**: computed
+from the repo's standing state only, content catches excluded, and labelled as what it is. It has
+not blocked anything since v0.55.0 and it still does not.
+
+### Every generated artifact is validated in its own format
+
+v0.55.0 added YAML parsing for generated workflows after one shipped unparseable. The same gap was
+still open for git hooks — **no shell syntax check existed anywhere in the suite** — and a broken
+pre-commit hook breaks every commit in every repo that installed it. `sh -n` now runs over every
+managed hook, including when appended after a foreign hook such as husky's.
+
+The rule this generalises: what Hivelore *computes* had 892 tests; what Hivelore *delivers* had none.
+A generated file is a deliverable. Parse it, or run it.
+
+### The sensor seed generator tests itself against the lesson's own counter-example
+
+It proposed an inverted pattern three times in the field — most recently `uses\s*:\s*["']?Doucs91`,
+lifted from the very line showing how to consume the action *correctly*. `propose_sensor` rejects
+these, so nothing unsafe could ever be armed, but a visibly absurd first suggestion teaches agents to
+stop reading the loop — and the sensor loop is the most valuable thing Hivelore does.
+
+A candidate is now matched against the lesson's own "Instead, use" / "How to apply" sections before
+being emitted, and dropped if it fires on them. Discriminating sensors are exempt when their `absent`
+companion is present, so "X without Y" lessons still produce seeds. No seed beats an inverted seed.
+
+### Feedback speed
+
+The gate's rule has 18 unit tests that run in **~30 ms**; the equivalent coverage previously required
+the 104-second CLI integration suite. Parallelising that suite was tried and reverted: vitest 2.1.9
+resolves worker paths through a URL and collects zero tests when the checkout path contains a space
+(`.../New idea` → `New%20idea`). Recorded as a lesson with a `block` sensor so nobody re-attempts it.
+The durable fix is the one applied here — keep logic that can be decided from inputs alone out of the
+integration suite.
+
+
 ## [0.55.0] — Field-report release: the gate refuses on evidence, and what we ship actually runs
 
 A user ran Hivelore end-to-end through a real working session on two production repositories
