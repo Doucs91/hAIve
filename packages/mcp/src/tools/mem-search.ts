@@ -16,6 +16,7 @@ import {
   type UsageIndex,
 } from "@hivelore/core";
 import { z } from "zod";
+import { runSemantic } from "../embeddings-runtime.js";
 import type { HaiveContext } from "../context.js";
 
 export const MemSearchInputSchema = {
@@ -205,17 +206,16 @@ async function trySemanticSearch(
   filtered: LoadedMemory[],
   usage: UsageIndex,
 ): Promise<MemSearchOutput | null> {
-  let mod: typeof import("@hivelore/embeddings");
-  try {
-    mod = await import("@hivelore/embeddings");
-  } catch {
-    return null;
-  }
-  const result = await mod.semanticSearch(ctx.paths, input.query, {
-    limit: Math.min(input.limit * 3, 100),
-    minScore: input.min_score,
-  });
-  if (!result) return null;
+  // The guard covers the search too, not just the import: the transformers runtime initialises on
+  // first use, so a broken native install threw past the literal fallback this function exists for.
+  const outcome = await runSemantic((mod) =>
+    mod.semanticSearch(ctx.paths, input.query, {
+      limit: Math.min(input.limit * 3, 100),
+      minScore: input.min_score,
+    }),
+  );
+  if (!outcome.ok || !outcome.value) return null;
+  const result = outcome.value;
 
   const allowedIds = new Set(filtered.map((m) => m.memory.frontmatter.id));
   const byId = new Map(filtered.map((m) => [m.memory.frontmatter.id, m]));

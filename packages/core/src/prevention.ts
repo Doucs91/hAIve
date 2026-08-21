@@ -251,6 +251,49 @@ export function renderPreventionReceiptShare(receipt: PreventionReceipt): string
   return lines.join("\n");
 }
 
+/** Stable marker the CI job greps for to update its own comment instead of posting a new one. */
+export const PREVENTION_RECEIPT_MARKER = "<!-- haive:prevention-receipt -->";
+
+export interface PreventionCommentFinding {
+  code?: string;
+  message?: string;
+  memory_ids?: string[];
+  file?: string;
+  /** The exact source line that matched — what makes the receipt actionable rather than a tally. */
+  matched_line?: string;
+}
+
+/**
+ * Full PR-comment body: marker + what fired on THIS pull request + the rolling receipt.
+ *
+ * This used to be assembled by a multi-line `jq -nr` program embedded in the generated
+ * `hivelore-enforcement.yml`. Its literal newlines terminated the surrounding YAML scalar, so the
+ * workflow every user got from `hivelore init` did not parse and GitHub refused to run it at all
+ * ("This run likely failed because of a workflow file issue"). Rendering the body here means the
+ * generated YAML holds a plain command and never a program — the defect class cannot come back.
+ */
+export function renderPreventionComment(
+  receipt: PreventionReceipt,
+  findings: PreventionCommentFinding[] = [],
+): string {
+  const fired = findings.filter((f) => f.code === "sensor-block" || f.code === "sensor-warn");
+  const lines = [PREVENTION_RECEIPT_MARKER, "", "## Hivelore prevention receipt", ""];
+  if (fired.length === 0) {
+    lines.push("No documented sensor fired on this PR.", "");
+  } else {
+    lines.push("### Fired on this PR", "");
+    for (const f of fired) {
+      // Name the pattern AND where it fired: "score 40%" is not actionable, `file:line` is.
+      const where = f.file ? ` — \`${f.file}\`` : "";
+      lines.push(`- **${f.memory_ids?.[0] ?? "sensor"}**${where} — ${f.message ?? "sensor fired"}`);
+      if (f.matched_line) lines.push(`  \`\`\`\n  ${f.matched_line}\n  \`\`\``);
+    }
+    lines.push("");
+  }
+  lines.push(renderPreventionReceiptShare(receipt));
+  return lines.join("\n");
+}
+
 /** Read all catch events (skips malformed lines). */
 export async function loadPreventionEvents(paths: HaivePaths): Promise<PreventionEvent[]> {
   const file = preventionLogPath(paths);

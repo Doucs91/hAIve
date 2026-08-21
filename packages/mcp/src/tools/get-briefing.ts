@@ -661,6 +661,7 @@ export async function getBriefing(
     autoContextGenerated,
     hasLastSession: Boolean(lastSession),
     searchMode,
+    hasInputFiles: input.files.length > 0,
   });
 
   // ── Code-map symbol lookup ─────────────────────────────────────────────

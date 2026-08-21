@@ -1,4 +1,5 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -31,8 +32,20 @@ export interface CodeFileEntry {
 
 export interface CodeMap {
   version: 1;
+  /**
+   * When this map was last WRITTEN — i.e. when its content last changed, since an unchanged scan
+   * no longer rewrites the file (see `saveCodeMap`). Back-filled on load from the runtime sidecar
+   * or the file mtime; it is deliberately NOT part of the committed payload, because a per-run
+   * timestamp made every `sync` produce a diff and conflict on every `pull` for every developer.
+   */
   generated_at: string;
+  /**
+   * Absolute project root, back-filled on load. Never serialized: it embedded one developer's
+   * home directory in a shared file, so no two machines could produce the same bytes.
+   */
   root: string;
+  /** Digest of the serialized payload — the staleness key, replacing "was it regenerated?". */
+  content_hash?: string;
   files: Record<string, CodeFileEntry>;
 }
 
@@ -83,16 +96,63 @@ export function codeMapPath(paths: HaivePaths): string {
   return path.join(paths.haiveDir, CODE_MAP_FILE);
 }
 
+/** Local, gitignored sidecar holding the one field that cannot be deterministic: when we last wrote. */
+function codeMapMetaPath(paths: HaivePaths): string {
+  return path.join(paths.runtimeDir, "code-map-meta.json");
+}
+
+/**
+ * Serialize a code-map so that the same source tree always produces the SAME BYTES, on any machine.
+ *
+ * Two fields used to break that and made the file unversionable: an absolute `root` (one developer's
+ * home directory) and a `generated_at` stamped on every run. Together they guaranteed a conflicting
+ * diff on every `sync` for every developer — the file could neither be committed nor ignored
+ * (`doctor` asks for it). Both now live outside the payload, and `files` keys are sorted so readdir
+ * order cannot reshuffle 500 KB of JSON.
+ */
+export function serializeCodeMap(map: CodeMap): string {
+  const files: Record<string, CodeFileEntry> = {};
+  for (const key of Object.keys(map.files).sort()) files[key] = map.files[key]!;
+  return `${JSON.stringify({ version: map.version, files }, null, 2)}\n`;
+}
+
+export function codeMapContentHash(map: CodeMap): string {
+  return createHash("sha256").update(serializeCodeMap(map)).digest("hex").slice(0, 16);
+}
+
 export async function loadCodeMap(paths: HaivePaths): Promise<CodeMap | null> {
   const file = codeMapPath(paths);
   if (!existsSync(file)) return null;
-  return JSON.parse(await readFile(file, "utf8")) as CodeMap;
+  const parsed = JSON.parse(await readFile(file, "utf8")) as CodeMap;
+  // Back-fill the two fields we no longer persist, so every consumer (staleness checks, the
+  // embeddings code index, doctor) keeps reading the same shape it always has.
+  const generatedAt =
+    parsed.generated_at ??
+    (await readFile(codeMapMetaPath(paths), "utf8")
+      .then((raw) => (JSON.parse(raw) as { generated_at?: string }).generated_at)
+      .catch(() => undefined)) ??
+    (await stat(file).then((s) => s.mtime.toISOString()).catch(() => new Date(0).toISOString()));
+  return { ...parsed, root: parsed.root ?? paths.root, generated_at: generatedAt };
 }
 
+/**
+ * Write the map only when its content actually changed. An unchanged scan is a no-op, so the file
+ * mtime — and therefore every "is the index stale?" check downstream — moves on content change
+ * rather than on "did someone run sync?".
+ */
 export async function saveCodeMap(paths: HaivePaths, map: CodeMap): Promise<void> {
   const file = codeMapPath(paths);
+  const payload = serializeCodeMap(map);
+  const current = existsSync(file) ? await readFile(file, "utf8").catch(() => null) : null;
+  if (current === payload) return;
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(map, null, 2), "utf8");
+  await writeFile(file, payload, "utf8");
+  await mkdir(paths.runtimeDir, { recursive: true }).catch(() => {});
+  await writeFile(
+    codeMapMetaPath(paths),
+    `${JSON.stringify({ generated_at: new Date().toISOString(), content_hash: codeMapContentHash(map) }, null, 2)}\n`,
+    "utf8",
+  ).catch(() => {});
 }
 
 export async function buildCodeMap(

@@ -10,9 +10,11 @@ import {
 } from "@hivelore/core";
 import { ui } from "../utils/ui.js";
 import { getBridgeFileStatuses, writeBridgeFiles } from "../utils/bridge-files.js";
+import { detectBridgeTargets } from "../utils/bridge-detect.js";
 
 interface BridgesSyncOptions {
   all?: boolean;
+  yes?: boolean;
   only?: string;
   maxMemories?: string;
   dryRun?: boolean;
@@ -35,8 +37,9 @@ export function registerBridges(program: Command): void {
       "  .github/copilot-instructions.md).\n" +
       "  This is the reach differentiator vs memories.sh: our bridges carry enforcement, not just injection.\n\n" +
       "  Example:\n" +
-      "    hivelore bridges sync --all\n" +
-      "    hivelore bridges sync --only cline,windsurf\n",
+      "    hivelore bridges sync                    # detected clients + bridges already in the repo\n" +
+      "    hivelore bridges sync --only cline,windsurf\n" +
+      "    hivelore bridges sync --all --yes        # every target, including unused clients\n",
     );
 
   bridges
@@ -45,7 +48,12 @@ export function registerBridges(program: Command): void {
       "Regenerate bridge files idempotently (marker-based, preserves manual content outside markers).\n" +
       "  Supported targets: " + BRIDGE_TARGETS.join(", ") + "\n",
     )
-    .option("--all", "generate all supported bridge targets")
+    .option(
+      "--all",
+      "generate EVERY supported bridge target, including clients this machine shows no sign of using " +
+        "(requires --yes, or use --dry-run to preview)",
+    )
+    .option("-y, --yes", "confirm --all: actually create files for undetected clients", false)
     .option(
       "--only <targets>",
       "comma-separated list of targets to generate (e.g. cline,windsurf,agents)",
@@ -79,16 +87,39 @@ export function registerBridges(program: Command): void {
         }
         targets = requested as BridgeTarget[];
       } else if (opts.all) {
+        // `--all` writes 12 files. On a repo using Claude Code and Cursor, seven of them
+        // (.clinerules, .continuerules, .roo/, .rules, .sourcegraph/, .windsurfrules,
+        // CONVENTIONS.md) are for clients nobody there runs: pure `git status` noise, and the
+        // first thing a new user sees. It stays available — it is now just deliberate.
+        const detection = detectBridgeTargets(root);
+        const undetected = BRIDGE_TARGETS.filter((t) => !detection.targets.includes(t));
+        if (undetected.length > 0 && !opts.yes && !dryRun) {
+          ui.warn(
+            `--all would also create ${undetected.length} bridge file(s) for clients not detected here:`,
+          );
+          for (const t of undetected) console.log(ui.dim(`    ${BRIDGE_TARGET_PATH[t]}  (${t})`));
+          console.log(
+            `\n  Detected here: ${detection.targets.join(", ") || "none"}` +
+            `\n  Generate just those:  hivelore bridges sync` +
+            `\n  Generate some:        hivelore bridges sync --only ${undetected.slice(0, 2).join(",")}` +
+            `\n  Really generate all:  hivelore bridges sync --all --yes\n`,
+          );
+          process.exitCode = 1;
+          return;
+        }
         targets = BRIDGE_TARGETS;
       } else {
-        // Default: generate only for files that already exist in the project.
-        targets = BRIDGE_TARGETS.filter((t) =>
-          existsSync(path.join(root, BRIDGE_TARGET_PATH[t])),
-        );
+        // Default: bridge files already in the repo, plus the clients this machine actually shows
+        // signs of running. Never a file for a client nobody here uses.
+        const detection = detectBridgeTargets(root);
+        targets = [...new Set([
+          ...BRIDGE_TARGETS.filter((t) => existsSync(path.join(root, BRIDGE_TARGET_PATH[t]))),
+          ...detection.targets,
+        ])];
         if (targets.length === 0) {
           ui.info(
-            "No existing bridge files detected. Pass --all to generate all targets, or " +
-            "--only <target> to generate a specific one.",
+            "No bridge files present and no agent client detected on this machine. " +
+            "Pass --only <target> to generate a specific one, or --all --yes for every target.",
           );
           return;
         }

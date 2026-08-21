@@ -6,6 +6,110 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.55.0] — Field-report release: the gate refuses on evidence, and what we ship actually runs
+
+A user ran Hivelore end-to-end through a real working session on two production repositories
+(Spring Boot 3.4 / React 19) and wrote it up: nine PRs merged, a security fix, two CI pipelines
+repaired. They scored it **62/100**. This release is that report, worked through.
+
+Two findings were not opinions — they were things we shipped broken and never tested.
+
+### Fixed — reliability
+
+- **The generated `hivelore-enforcement.yml` was not valid YAML.** The `Upsert prevention receipt`
+  step embedded a multi-line `jq -nr` program inside a double-quoted YAML scalar; TypeScript turned
+  the `\n` escapes in the template literal into real newlines, which dedented the program to column 1
+  and terminated the scalar. GitHub could not parse the file, so it ran **zero jobs** and reported
+  only *"This run likely failed because of a workflow file issue"* — a permanent, undiagnosable
+  failure on every PR and push, in every repo that had run `hivelore init`. The reporter deleted the
+  file from two repositories by hand.
+  The receipt body is now rendered by the CLI (`hivelore stats receipt --comment --gate <file>`,
+  backed by `renderPreventionComment` in core), so the generated workflow contains a command and
+  never a program. `packages/cli/test/generated-workflows.test.ts` parses every workflow `init` and
+  `enforce install` emit; it was verified to fail on the pre-fix artifact with the reporter's exact
+  error (*line 47, column 1*).
+
+- **The published GitHub Action shipped without its dependencies.** tsup externalises
+  `dependencies` by default — correct for the CLI and MCP packages, exactly wrong for a composite
+  action that runs a committed `dist/` from a bare checkout with no `npm install`. The 12 KB bundle
+  opened with `require("@actions/github")` and died with `Cannot find module '@actions/github'` on
+  every pull request in every adopting repo. Now bundled (528 KB, Node built-ins only) via a real
+  `tsup.config.ts`; `test/bundle.test.ts` asserts no external require, and CI both verifies the
+  committed bundle is in sync and **runs it** in an empty directory — `npm pack` could never have
+  caught this.
+
+- **A broken embeddings install took the whole briefing down.** Every call site wrapped only the
+  dynamic `import()` in a try/catch and left the `semanticSearch(...)` call outside it. The import is
+  cheap; the search is where the transformers runtime and its native dependencies actually load. So
+  on a machine where those were broken — the ordinary state after a Node major upgrade
+  (`Cannot find module '../build/Release/sharp-*.node'`) — the exception escaped and aborted
+  `get_briefing` instead of falling back to lexical ranking. New `runSemantic` helper covers load
+  **and** call at every site (briefing, `mem_search`, `code_search`), and the messages now separate
+  "not installed" from "installed but its runtime failed to load" — telling someone to install a
+  package they already have is what made this so hard to diagnose. This is a large part of why the
+  report scored briefing quality 30/100 and saw `--embed` fail with the package present.
+
+- **`.ai/code-map.json` is versionable again.** It serialized an absolute `root` (one developer's
+  home directory) and a `generated_at` stamped on every run, so 528 KB of JSON produced a conflicting
+  diff on every `sync` for every developer — the file could neither be committed nor ignored, since
+  `doctor` asks for it. Both now live outside the payload (`root` and `generated_at` are back-filled
+  on load, so every consumer is unchanged), file keys are sorted, and an unchanged scan does not
+  rewrite the file at all.
+
+### Changed — the gate refuses on evidence, and only on evidence
+
+The report's central charge: *"what creates value (the sensors) is optional and manual; what creates
+friction (the compliance score) is automatic and blocking."* Two pushes were refused, both carrying
+tested code with a green SonarQube gate and zero violations, and **not one penalty was about the
+code** — `briefing-missing (−35)`, `session-recap-missing (−20)`, `bootstrap-incomplete (−5)`. The
+predictable answer to that is `git push --no-verify`, which costs the developer the whole gate,
+sensors included. A gate routinely bypassed protects nothing.
+
+- **New `enforcement.processGate`, defaulting to `"warn"`.** Process gates (briefing, session recap,
+  decision coverage, bootstrap) now report at every stage and refuse at none. Only deterministic,
+  code-bound findings block: block sensors, anti-pattern blocks, stale anchors on touched files,
+  artifact hygiene. Set `processGate: "block"` for the previous behaviour.
+- **The composite score no longer blocks anything.** "Enforcement score 40% is below required
+  threshold 85%" is a measurement, not a verdict, and it moved for reasons unrelated to the change
+  under review. It is still computed and still names its top penalties — and it is now suppressed
+  entirely when something did refuse, so a real block is never buried under score noise.
+- **A refusal names the offending line.** Regex sensor findings carry `file` and `matched_line` (the
+  AST branch already did), both in the gate output and in the PR receipt comment.
+- **Stale anchors block only on files the change touches.** `stale-important-memories` was computed
+  over the entire corpus, so a push was refused for a memory anchored somewhere the author never
+  went — punishing whoever passes through rather than whoever introduced it. Stale anchors elsewhere
+  are now reported as `stale-memories-elsewhere` (warning, corpus maintenance).
+
+### Changed — ergonomics
+
+- **Stack packs are opt-in.** Seeding them by default filled a new corpus with generic advice nobody
+  wrote for the repo; the first briefing of a real session read `thin · must_read=0 useful=0
+  background=3`, all three being stack-pack platitudes. An empty corpus is more honest — it says
+  plainly that it needs filling. `hivelore init --stack auto` still seeds them.
+- **`bridges sync --all` asks first.** It writes 12 files; on a Claude-and-Cursor repo, seven are for
+  clients nobody there runs. It now lists them and requires `--yes`. The default target set gained
+  machine detection, so it covers the clients actually in use rather than only pre-existing files.
+- **A rejected `block` sensor explains the way out.** `fires-on-current` only ever said "add or
+  tighten `absent`", which assumes an imprecise pattern. The far more common cause went unnamed: the
+  pattern is right and **the faulty code is still there** — the normal state when you document a
+  problem before fixing it, which makes arming the sensor impossible exactly when you want to. Both
+  causes are now named, and the warn-first path (arm as `warn` → fix → promote to `block`) is spelled
+  out with the exact command. Shared by the CLI and MCP via `explainSensorRejection` in core.
+- **Repeated advisories stop repeating.** The bootstrap checklist is six lines worth reading once and
+  wallpaper on the fiftieth commit. Full text once per 24h, one line otherwise; `--json` and
+  `--explain` always carry the complete message.
+- **Anchorless memories get suggested anchors.** `memory save` without `--paths` now offers the files
+  named in the body that actually exist in the repo, prefilled into the `memory update` command.
+- **`init` says the MCP server needs a client restart** — clients read their server list only at
+  startup — and names the CLI equivalents that work right now.
+- **Discoverability.** Three capabilities the report asked for already existed and could not be
+  found: PR review comments → memories (`ingest --from github-pr <n>`), and structural sensors
+  (`sensors propose --kind ast|shell|test`, which route Sonar/ESLint/ArchUnit/Semgrep or the team's
+  own suite). Both are now surfaced in the help where someone would look. `get_briefing` also says
+  when it was called without `files`, since anchor proximity is its strongest ranking signal and the
+  caller is the only one who can supply it.
+
+
 ## [0.54.0] — Friction journal — agents report Hivelore's own bugs, humans publish them
 
 Agents hit friction with Hivelore itself and had nowhere to put it, so it evaporated at the end of

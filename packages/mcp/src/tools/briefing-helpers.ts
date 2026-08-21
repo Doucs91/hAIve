@@ -8,6 +8,7 @@ import {
   priorityRank as corePriorityRank,
 } from "@hivelore/core";
 import type { LoadedMemory } from "@hivelore/core";
+import { runSemantic } from "../embeddings-runtime.js";
 import type { HaiveContext } from "../context.js";
 import type {
   BriefingMemory,
@@ -72,6 +73,8 @@ export function classifyBriefingQuality(
     autoContextGenerated: boolean;
     hasLastSession: boolean;
     searchMode: BriefingOutput["search_mode"];
+    /** Whether the caller told us which files it is about to touch. */
+    hasInputFiles?: boolean;
   },
 ): BriefingQuality {
   const mustRead = memories.filter((m) => m.priority === "must_read").length;
@@ -93,6 +96,16 @@ export function classifyBriefingQuality(
   if (background > useful + mustRead && background > 2) reasons.push(`${background} background memories dominate the result`);
   if (weakSemantic > 0) reasons.push(`${weakSemantic} weak semantic-only match${weakSemantic === 1 ? "" : "es"}`);
   if (context.searchMode === "literal_fallback") reasons.push("semantic index unavailable or empty; literal fallback used");
+  // Anchor proximity is the STRONGEST ranking signal there is — a memory anchored to a file you are
+  // about to edit goes straight to must_read, ahead of anything semantic. It is also the one signal
+  // the caller can switch on, and it is unavailable when `files` is omitted. A briefing that came
+  // back thin without it should say so rather than let the caller conclude the corpus is empty.
+  if (context.hasInputFiles === false && mustRead === 0) {
+    reasons.push(
+      "no `files` were passed, so anchored memories could not be matched — pass the files you are " +
+      "about to edit to surface the policy attached to them",
+    );
+  }
 
   if (memories.length === 0 || (mustRead === 0 && useful === 0)) {
     return { level: "thin", reasons };
@@ -168,20 +181,33 @@ export function explainWhySurfaced(
   return why;
 }
 
+/**
+ * Semantic hits for the briefing, or null when semantic ranking is unavailable for ANY reason.
+ *
+ * Both the load and the search run inside `runSemantic`: the search is where the transformers
+ * runtime is actually initialised, and letting it throw used to abort the entire `get_briefing`
+ * call rather than fall back to lexical ranking. See `embeddings-runtime.ts`.
+ */
 export async function trySemanticHits(
   ctx: HaiveContext,
   task: string,
   limit: number,
 ): Promise<Array<{ id: string; score: number }> | null> {
-  let mod: typeof import("@hivelore/embeddings");
-  try {
-    mod = await import("@hivelore/embeddings");
-  } catch {
-    return null;
-  }
-  const result = await mod.semanticSearch(ctx.paths, task, { limit });
-  if (!result) return null;
-  return result.hits.map((h) => ({ id: h.id, score: h.score }));
+  const outcome = await runSemantic((mod) => mod.semanticSearch(ctx.paths, task, { limit }));
+  if (!outcome.ok || !outcome.value) return null;
+  return outcome.value.hits.map((h) => ({ id: h.id, score: h.score }));
+}
+
+/** Same call, but surfacing WHY ranking degraded so the briefing can say so out loud. */
+export async function trySemanticHitsWithNotice(
+  ctx: HaiveContext,
+  task: string,
+  limit: number,
+): Promise<{ hits: Array<{ id: string; score: number }> | null; notice?: string }> {
+  const outcome = await runSemantic((mod) => mod.semanticSearch(ctx.paths, task, { limit }));
+  if (!outcome.ok) return { hits: null, notice: outcome.notice };
+  if (!outcome.value) return { hits: null };
+  return { hits: outcome.value.hits.map((h) => ({ id: h.id, score: h.score })) };
 }
 
 export async function loadModuleContexts(

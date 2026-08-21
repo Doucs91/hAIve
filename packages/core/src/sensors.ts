@@ -629,6 +629,56 @@ export function judgeProposedSensor(
 }
 
 /**
+ * One wording for every sensor rejection, shared by the CLI (`sensors propose`) and the MCP
+ * (`propose_sensor`) so the two façades cannot drift.
+ *
+ * `fires-on-current` in particular used to say only "add or tighten `absent`", which assumes the
+ * pattern is imprecise. There is a second, very common cause the message never named: the pattern is
+ * exactly right and **the faulty code is still in the tree** — which is the normal state at the
+ * moment you document the problem. Requiring silence-on-current then makes arming a `block` sensor
+ * impossible precisely when you want to arm it. A field report hit this and had to infer the
+ * sequence (write the lesson → fix the code → come back and arm) from a bare refusal. Both causes
+ * are now named, and the warn-first path out is spelled with the exact command.
+ */
+export function explainSensorRejection(
+  verdict: ProposedSensorVerdict,
+  context: { style: "cli" | "mcp"; memoryId?: string },
+): string {
+  const retry = context.style === "cli" ? "re-run" : "re-propose";
+  switch (verdict.reason) {
+    case "fires-on-current": {
+      const where = verdict.self_check.fired_on.join(", ");
+      const warnCommand =
+        context.style === "cli"
+          ? `hivelore sensors propose ${context.memoryId ?? "<memory-id>"} --pattern '<same>' --severity warn`
+          : `propose_sensor({ memory_id: "${context.memoryId ?? "<memory-id>"}", pattern: "<same>", severity: "warn" })`;
+      return [
+        `A block sensor must be silent on the current code, and this one fires on: ${where}.`,
+        "That means one of two things:",
+        `  1. The faulty pattern is STILL PRESENT — the usual case when you document a problem before`,
+        `     fixing it. A block sensor cannot be armed yet. Arm it as a warning now, fix the code,`,
+        `     then promote it:`,
+        `       ${warnCommand}`,
+        `       …then re-run the same proposal with severity "block" once ${where} is clean.`,
+        `  2. The pattern also matches LEGITIMATE usage. Add or tighten the 'absent' companion so`,
+        `     correct usage is excluded, then ${retry}.`,
+      ].join("\n");
+    }
+    case "fires-on-correct":
+      return (
+        "Inverted: the pattern matches the lesson's OWN recommended fix (its `Instead, use:` approach) — " +
+        `it would block correct code and never the mistake. Point the pattern at the FAULTY usage, then ${retry}.`
+      );
+    case "missed-bad-example":
+      return `The sensor did not match the bad example, so it won't catch the mistake. Adjust the pattern, then ${retry}.`;
+    case "brittle":
+      return `The pattern is brittle (${verdict.brittle}). Use a durable pattern (avoid hardcoded line numbers), then ${retry}.`;
+    default:
+      return `Re-propose with a discriminating pattern, then ${retry}.`;
+  }
+}
+
+/**
  * A command oracle that exits non-zero has either FAILED an assertion (a real signal) or errored
  * before it could reach one — a missing module, an import/collection failure, a syntax error, or
  * "no tests found". Only the former proves anything. This distinguishes them from the output tail.

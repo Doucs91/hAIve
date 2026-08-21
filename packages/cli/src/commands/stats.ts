@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   aggregateUsage,
@@ -9,6 +9,8 @@ import {
   loadCodeMap,
   renderBehaviourCoverageLine,
   renderPreventionReceipt,
+  renderPreventionComment,
+  type PreventionCommentFinding,
   findProjectRoot,
   loadMemoriesFromDir,
   loadUsageIndex,
@@ -38,10 +40,16 @@ export function registerStats(program: Command): void {
     .command("receipt")
     .description("Show documented mistakes refused by the gate over a time window")
     .option("--share", "emit a Markdown block ready to paste into Slack or a PR (with attribution)", false)
+    .option(
+      "--comment",
+      "emit the full PR-comment body (marker + what fired on this PR + receipt) — used by the CI workflow",
+      false,
+    )
+    .option("--gate <file>", "path to a `hivelore enforce ci --json` report, to list what fired on this PR")
     .addHelpText("after", "\nParent options also apply: --since <window> (default 7d here), --json, --dir <dir>.")
     .action(async () => {
       const opts = stats.opts<{ since?: string; json?: boolean; dir?: string }>();
-      const sub = receiptCmd.opts<{ share?: boolean }>();
+      const sub = receiptCmd.opts<{ share?: boolean; comment?: boolean; gate?: string }>();
       const root = findProjectRoot(opts.dir);
       const paths = resolveHaivePaths(root);
       const sinceRaw = stats.getOptionValueSource("since") === "default" ? "7d" : (opts.since ?? "7d");
@@ -52,15 +60,24 @@ export function registerStats(program: Command): void {
         existsSync(paths.memoriesDir) ? loadMemoriesFromDir(paths.memoriesDir) : Promise.resolve([]),
       ]);
       const receipt = buildPreventionReceipt(events, memories, usage, { since });
-      const output = sub.share
-        ? renderPreventionReceiptShare(receipt)
-        : opts.json
-          ? JSON.stringify(receipt, null, 2)
-          : renderPreventionReceipt(receipt);
+      // A missing or unreadable gate report is not an error: the receipt still stands on its own,
+      // and CI must never fail because the comment body could not name this PR's findings.
+      const gateFindings = sub.gate
+        ? await readFile(sub.gate, "utf8")
+            .then((raw) => (JSON.parse(raw) as { findings?: PreventionCommentFinding[] }).findings ?? [])
+            .catch(() => [])
+        : [];
+      const output = sub.comment
+        ? renderPreventionComment(receipt, gateFindings)
+        : sub.share
+          ? renderPreventionReceiptShare(receipt)
+          : opts.json
+            ? JSON.stringify(receipt, null, 2)
+            : renderPreventionReceipt(receipt);
       console.log(output);
       // Behaviour-harness standing — a "where we are" footer for the human receipt (not the JSON /
       // share formats, which are structured/attribution surfaces). Best-effort: never break the receipt.
-      if (!opts.json && !sub.share) {
+      if (!opts.json && !sub.share && !sub.comment) {
         try {
           const codeMap = await loadCodeMap(paths);
           if (codeMap) {

@@ -24,6 +24,8 @@ import {
   loadConfig,
   detectAgentContext,
   loadMemoriesFromDir,
+  shouldExpandGateReminder,
+  recordGateReminder,
   loadSensorLedger,
   memoryMatchesAnchorPaths,
   readRecentBriefingMarker,
@@ -145,6 +147,21 @@ interface EnforcementFinding {
   reason?: string;
   affected_files?: string[];
   memory_ids?: string[];
+  /** Project-relative file a deterministic finding fired on, when one is known. */
+  file?: string;
+  /**
+   * Collapsed rendering for a repeated advisory. The gate's teaching text (the bootstrap checklist)
+   * is worth six lines the first time and wallpaper the fiftieth; when set, human output prints this
+   * instead. `message` is always the complete text, so --json and --explain are unaffected.
+   */
+  short_message?: string;
+  /**
+   * The exact source line that matched. This is what makes a refusal actionable: "score 40%" gives
+   * a developer nothing to change, the offending line gives them everything. The scan runs over the
+   * ADDED lines of the diff, so a numeric index into it would not be the file's line number — the
+   * text is reported instead, which is both correct and easier to locate.
+   */
+  matched_line?: string;
 }
 
 interface EnforcementScore {
@@ -1210,8 +1227,12 @@ async function buildEnforcementReport(
           });
   }
 
+  // Resolved once and shared: several gates need to know WHAT CHANGED in order to judge the change
+  // rather than the repo's overall state.
+  const changedFiles = await getChangedFiles(root, stage).catch(() => [] as string[]);
+
   if (config.enforcement?.requireMemoryVerify !== false) {
-    findings.push(...await verifyMemoryPolicy(paths, config));
+    findings.push(...await verifyMemoryPolicy(paths, config, changedFiles));
   }
 
   if (config.enforcement?.requireDecisionCoverage !== false) {
@@ -1239,10 +1260,9 @@ async function buildEnforcementReport(
     findings.push(...await findGeneratedArtifacts(paths));
   }
 
-  {
-    const changed = await getChangedFiles(root, stage).catch(() => [] as string[]);
-    findings.push(...await checkBootstrapComplete(paths, config, changed.some(looksLikeProductionCode), stage));
-  }
+  findings.push(
+    ...await checkBootstrapComplete(paths, config, changedFiles.some(looksLikeProductionCode), stage),
+  );
 
   // PROCESS gates bind the agent workflow ("consult team knowledge before changing code");
   // a human committing by hand is the trusted author of that knowledge. When no agent harness
@@ -1257,12 +1277,6 @@ async function buildEnforcementReport(
     (config.enforcement?.humanCommits ?? "relaxed") === "relaxed";
   let effectiveFindings = findings;
   if (relaxForHuman) {
-    const PROCESS_GATE_CODES = new Set([
-      "briefing-missing",
-      "session-recap-missing",
-      "decision-coverage-missing",
-      "bootstrap-incomplete",
-    ]);
     effectiveFindings = findings.map((f) =>
       f.severity === "error" && PROCESS_GATE_CODES.has(f.code)
         ? {
@@ -1277,6 +1291,25 @@ async function buildEnforcementReport(
     );
   }
 
+  // PROCESS gates are advisory EVERYWHERE by default (enforcement.processGate, v0.55.0). The gate
+  // spends its refusals only where it has deterministic, code-bound evidence; "you did not write a
+  // session recap" is a request, not a verdict on the diff. Set processGate:"block" for the old
+  // behaviour. See the config doc-comment for the field evidence behind the default.
+  if ((config.enforcement?.processGate ?? "warn") === "warn") {
+    effectiveFindings = effectiveFindings.map((f) =>
+      f.severity === "error" && PROCESS_GATE_CODES.has(f.code)
+        ? {
+            ...f,
+            severity: "warn" as const,
+            impact: Math.min(f.impact ?? 8, 8),
+            message:
+              `${f.message} (advisory: process gates report, they do not refuse — only sensors and ` +
+              `other deterministic findings block. Set enforcement.processGate="block" to change that.)`,
+          }
+        : f,
+    );
+  }
+
   // At COMMIT time, PROCESS/STATE gates are advisory — only DETERMINISTIC content findings
   // (sensor-block, precommit-policy-block, stale anchors, generated artifacts) may block a local
   // commit. The process gates (briefing loaded, session recap, decision coverage, bootstrap) bind the
@@ -1286,12 +1319,6 @@ async function buildEnforcementReport(
   // the content checks are untouched, and everything still enforces before the code is shared.
   const commitStage = stage === "pre-commit" || stage === "local";
   if (commitStage) {
-    const PROCESS_GATE_CODES = new Set([
-      "briefing-missing",
-      "session-recap-missing",
-      "decision-coverage-missing",
-      "bootstrap-incomplete",
-    ]);
     effectiveFindings = effectiveFindings.map((f) =>
       f.severity === "error" && PROCESS_GATE_CODES.has(f.code)
         ? { ...f, severity: "warn" as const, impact: Math.min(f.impact ?? 8, 8) }
@@ -1300,11 +1327,20 @@ async function buildEnforcementReport(
   }
 
   const score = buildScore(effectiveFindings, config.enforcement?.scoreThreshold);
-  // The score-threshold BLOCK is a sharing-point concern too: at commit it would re-block on the very
-  // process penalties we just made advisory. Emit it only where the process gates are enforced.
-  if (score.score < score.threshold && !commitStage) {
-    // Name what the score is made of: an unexplained "10% < 85%" is the kind of opaque signal
-    // that trains people to ignore the gate. The top penalties tell the reader what to fix first.
+  // A composite score is a MEASUREMENT, not a verdict. It used to be its own blocking finding, so a
+  // push could be refused with "Enforcement score 40% is below required threshold 85%" while every
+  // penalty behind that number was a process gate and the diff itself was clean. That sentence tells
+  // a developer nothing they can act on, and the number moved for reasons unrelated to their change.
+  //
+  // The verdict now comes from the findings themselves — a block sensor names its pattern and the
+  // `file:line` it fired on. The score is still computed, still reported, and still says what is
+  // dragging it down, but it no longer refuses anything on its own: if nothing deterministic fired,
+  // there is nothing to refuse.
+  // ...and it is suppressed entirely when something DID refuse. When a documented lesson refuses a
+  // change, that lesson is the message; appending "score 2% — top penalties: …" underneath buries
+  // the one line the developer needs to act on.
+  const refused = effectiveFindings.some((f) => f.severity === "error");
+  if (score.score < score.threshold && !refused) {
     const topPenalties = effectiveFindings
       .map((f) => ({
         code: f.code,
@@ -1314,17 +1350,21 @@ async function buildEnforcementReport(
       .sort((a, b) => b.penalty - a.penalty)
       .slice(0, 3);
     effectiveFindings = [...effectiveFindings, {
-      severity: "error",
+      severity: "warn",
       code: "enforcement-score-below-threshold",
       message:
-        `Enforcement score ${score.score}% is below required threshold ${score.threshold}%` +
+        `Enforcement score ${score.score}% is below the ${score.threshold}% target` +
         (topPenalties.length > 0
           ? ` — top penalties: ${topPenalties.map((p) => `${p.code} (−${p.penalty})`).join(", ")}`
-          : "") + ".",
-      fix: "Load the relevant briefing, address policy findings, then rerun `hivelore enforce check`.",
+          : "") + ". This is a health measurement; it does not block on its own.",
+      fix: "Address the findings above, then rerun `hivelore enforce check`.",
       impact: 0,
     }];
   }
+
+  // Collapse an advisory reminder that has already been shown in full today. The finding, its
+  // severity and its fix are untouched — only how much of it a human sees again.
+  effectiveFindings = await collapseRepeatedReminders(paths, effectiveFindings);
 
   const hasErrors = effectiveFindings.some((f) => f.severity === "error");
   const report = withCategories({
@@ -1380,14 +1420,26 @@ async function hasRecentSessionRecap(paths: ReturnType<typeof resolveHaivePaths>
   });
 }
 
+/**
+ * Stale-anchor policy, scoped to the change under review.
+ *
+ * A stale memory anchored somewhere the author never touched is a CORPUS-MAINTENANCE problem, not a
+ * defect in their diff. Refusing their push for it punishes whoever happens to pass through rather
+ * than whoever introduced it — and the only lever they have is `--no-verify`, which also disables
+ * the sensors. So a stale anchor ON A FILE THIS CHANGE TOUCHES still refuses (that one IS about the
+ * diff: the author is editing code whose documented policy no longer matches it), and everything
+ * else is reported as a warning for the corpus owner to clear.
+ */
 async function verifyMemoryPolicy(
   paths: ReturnType<typeof resolveHaivePaths>,
   config: HaiveConfig,
+  changedFiles: string[] = [],
 ): Promise<EnforcementFinding[]> {
   if (!existsSync(paths.memoriesDir)) return [];
   const all = await loadMemoriesFromDir(paths.memoriesDir);
   const findings: EnforcementFinding[] = [];
   const staleImportant: string[] = [];
+  const staleElsewhere: string[] = [];
   let verified = 0;
 
   for (const { memory } of all) {
@@ -1395,15 +1447,18 @@ async function verifyMemoryPolicy(
     const anchored = fm.anchor.paths.length > 0 || fm.anchor.symbols.length > 0;
     if (!anchored || fm.status === "rejected" || fm.status === "deprecated") continue;
     verified++;
+    // Does this memory govern code the change actually touches? With no changed-file list at all
+    // (a bare `enforce check` preview), fall back to the previous repo-wide behaviour.
+    const touched = changedFiles.length === 0 || memoryMatchesAnchorPaths(memory, changedFiles);
     if (fm.status === "stale") {
       if (["decision", "gotcha", "architecture", "convention"].includes(fm.type)) {
-        staleImportant.push(fm.id);
+        (touched ? staleImportant : staleElsewhere).push(fm.id);
       }
       continue;
     }
     if (config.enforcement?.blockStaleDecisionChanges !== false && ["decision", "gotcha"].includes(fm.type)) {
       const result = await verifyAnchor(memory, { projectRoot: paths.root });
-      if (result.stale) staleImportant.push(fm.id);
+      if (result.stale) (touched ? staleImportant : staleElsewhere).push(fm.id);
     }
   }
 
@@ -1417,9 +1472,25 @@ async function verifyMemoryPolicy(
     findings.push({
       severity: "error",
       code: "stale-important-memories",
-      message: `${staleImportant.length} important anchored memories are stale: ${staleImportant.slice(0, 8).join(", ")}`,
+      message:
+        `${staleImportant.length} important anchored memor${staleImportant.length === 1 ? "y is" : "ies are"} stale ` +
+        `on files this change touches: ${staleImportant.slice(0, 8).join(", ")}`,
       fix: "Run `hivelore memory verify --update`, then update or delete stale decisions/gotchas before merging.",
       impact: 40,
+      affected_files: changedFiles.slice(0, 20),
+      memory_ids: staleImportant,
+    });
+  }
+  if (staleElsewhere.length > 0) {
+    findings.push({
+      severity: "warn",
+      code: "stale-memories-elsewhere",
+      message:
+        `${staleElsewhere.length} important anchored memor${staleElsewhere.length === 1 ? "y is" : "ies are"} stale ` +
+        `elsewhere in the repo — not on any file this change touches: ${staleElsewhere.slice(0, 8).join(", ")}`,
+      fix: "Corpus maintenance, not a defect in this change: run `hivelore memory verify --update` when convenient.",
+      impact: 3,
+      memory_ids: staleElsewhere,
     });
   }
   return findings;
@@ -1792,23 +1863,30 @@ async function runSensorGate(
       seen.add(hit.memory_id);
       firedIds.add(hit.memory_id);
       const where = hit.file ? ` (${hit.file})` : "";
+      // Always show the matched line: a refusal that names the offending code is actionable,
+      // one that only names a score is not. The AST branch below already did this.
+      const matched = hit.matched_line ? `\n  matched: ${hit.matched_line}` : "";
       if (hit.severity === "block") {
         findings.push({
           severity: "error",
           code: "sensor-block",
-          message: `Block sensor fired — ${hit.memory_id}: ${hit.message}${where}${incidentSuffix(hit.sensor.incident)}`,
+          message: `Block sensor fired — ${hit.memory_id}: ${hit.message}${where}${incidentSuffix(hit.sensor.incident)}${matched}`,
           fix: "Remove the flagged pattern, or run `hivelore sensors check` to inspect the match.",
           impact: 45,
           memory_ids: [hit.memory_id],
+          file: hit.file,
+          matched_line: hit.matched_line,
         });
       } else {
         findings.push({
           severity: "warn",
           code: "sensor-warn",
-          message: `Sensor flagged ${hit.memory_id}: ${hit.message}${where}${incidentSuffix(hit.sensor.incident)}`,
+          message: `Sensor flagged ${hit.memory_id}: ${hit.message}${where}${incidentSuffix(hit.sensor.incident)}${matched}`,
           fix: "Review the flagged line; `hivelore sensors check` shows the matched code.",
           impact: 5,
           memory_ids: [hit.memory_id],
+          file: hit.file,
+          matched_line: hit.matched_line,
         });
       }
     }
@@ -1864,6 +1942,8 @@ async function runSensorGate(
                 fix: "Remove the flagged construct, or run `hivelore sensors check` to inspect the match.",
                 impact: 45,
                 memory_ids: [memory.frontmatter.id],
+                file: `${target.path}:${scan.matches[0]!.startLine}`,
+                matched_line: scan.matches[0]!.text,
               });
             } else {
               findings.push({
@@ -1873,6 +1953,8 @@ async function runSensorGate(
                 fix: "Review the flagged construct; `hivelore sensors check` shows the matched code.",
                 impact: 5,
                 memory_ids: [memory.frontmatter.id],
+                file: `${target.path}:${scan.matches[0]!.startLine}`,
+                matched_line: scan.matches[0]!.text,
               });
             }
             break;
@@ -2705,6 +2787,38 @@ function formatGithubRunNames(runs: GithubActionsRun[]): string {
     .join(", ");
 }
 
+/**
+ * Advisory findings whose message carries multi-line teaching text. Shown in full once per window,
+ * then collapsed to one line — see `core/gate-reminder.ts` for why.
+ */
+const THROTTLED_REMINDER_CODES: Record<string, string> = {
+  "bootstrap-incomplete":
+    "First-agent bootstrap still pending — run `hivelore doctor` for the checklist.",
+};
+
+async function collapseRepeatedReminders(
+  paths: ReturnType<typeof resolveHaivePaths>,
+  findings: EnforcementFinding[],
+): Promise<EnforcementFinding[]> {
+  const out: EnforcementFinding[] = [];
+  for (const finding of findings) {
+    const collapsed = THROTTLED_REMINDER_CODES[finding.code];
+    // Only ever collapse an ADVISORY reminder. A finding that refuses the change must always state
+    // its full case — that is the one moment the text is guaranteed to be worth reading.
+    if (!collapsed || finding.severity === "error") {
+      out.push(finding);
+      continue;
+    }
+    if (await shouldExpandGateReminder(paths, finding.code).catch(() => true)) {
+      await recordGateReminder(paths, finding.code).catch(() => { /* best-effort */ });
+      out.push(finding);
+    } else {
+      out.push({ ...finding, short_message: collapsed });
+    }
+  }
+  return out;
+}
+
 function buildScore(findings: EnforcementFinding[], threshold = 80): EnforcementScore {
   const checks = {
     total: findings.length,
@@ -2848,7 +2962,7 @@ async function installCiEnforcement(root: string): Promise<void> {
   ui.success(`Created ${path.relative(root, workflowPath)}`);
 }
 
-function renderCiEnforcementWorkflow(): string {
+export function renderCiEnforcementWorkflow(): string {
   return `# hivelore:enforcement-workflow:start
 name: hivelore-enforcement
 
@@ -2889,23 +3003,16 @@ jobs:
           PR_NUMBER: \${{ github.event.pull_request.number }}
         run: |
           if [ -z "\${GH_TOKEN:-}" ] || ! command -v gh >/dev/null 2>&1; then exit 0; fi
-          receipt="$(hivelore stats receipt --since 7d --json 2>/dev/null)" || exit 0
-          gate="$(cat "$RUNNER_TEMP/hivelore-gate.json" 2>/dev/null)" || gate='{"findings":[]}'
-          body="$(jq -nr --arg marker '<!-- haive:prevention-receipt -->' --argjson receipt "$receipt" --argjson gate "$gate" '
-            $marker + "\n## Hivelore prevention receipt\n\n" +
-            (([$gate.findings[]? | select(.code == "sensor-block" or .code == "sensor-warn") |
-              "- **" + (.memory_ids[0] // "sensor") + "** — " + .message] | if length == 0 then
-              "No documented sensor fired on this PR." else "### Fired on this PR\n" + join("\n") end)) +
-            "\n\nWeekly total: **" + ($receipt.total|tostring) + "** refused; previous window: **" +
-            ($receipt.previous_total|tostring) + "**." +
-            "\n\n<sub>🛡️ Generated by [Hivelore](https://github.com/Doucs91/hivelore) — the deterministic policy gate for agent-written code.</sub>"
-          ')" || exit 0
-          comments="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate 2>/dev/null)" || exit 0
-          comment_id="$(printf '%s' "$comments" | jq -r '.[] | select(.body | contains("<!-- haive:prevention-receipt -->")) | .id' | head -1)"
-          if [ -n "$comment_id" ]; then
-            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -f body="$body" >/dev/null 2>&1 || true
+          hivelore stats receipt --since 7d --comment --gate "$RUNNER_TEMP/hivelore-gate.json" \\
+            > "$RUNNER_TEMP/hivelore-receipt.md" || exit 0
+          comments="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq \\
+            '.[] | select(.body | contains("<!-- haive:prevention-receipt -->")) | .id' 2>/dev/null | head -1)"
+          if [ -n "$comments" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comments" \\
+              -F body=@"$RUNNER_TEMP/hivelore-receipt.md" >/dev/null 2>&1 || true
           else
-            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null 2>&1 || true
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \\
+              -F body=@"$RUNNER_TEMP/hivelore-receipt.md" >/dev/null 2>&1 || true
           fi
       - name: Fail when enforcement blocked
         if: steps.gate.outputs.exit_code != '0'
@@ -2913,6 +3020,18 @@ jobs:
 # hivelore:enforcement-workflow:end
 `;
 }
+
+/**
+ * PROCESS gates: they describe the AGENT WORKFLOW around the change ("was team knowledge consulted?",
+ * "was the session recapped?"), never the change itself. Deterministic, code-bound findings live in
+ * CONTENT_CATCH_CODES below and are the only ones allowed to refuse by default.
+ */
+const PROCESS_GATE_CODES = new Set([
+  "briefing-missing",
+  "session-recap-missing",
+  "decision-coverage-missing",
+  "bootstrap-incomplete",
+]);
 
 // The deterministic "your diff repeated a documented lesson" catches — the signal a developer most
 // needs surfaced first, distinct from setup/baseline gates about the repo's own knowledge layer.
@@ -3010,7 +3129,7 @@ function printFinding(finding: EnforcementFinding, explain = false): void {
         : finding.severity === "ok"
           ? ui.green("✓")
           : ui.dim("•");
-    console.log(`${marker} ${finding.code}: ${finding.message}`);
+    console.log(`${marker} ${finding.code}: ${explain ? finding.message : finding.short_message ?? finding.message}`);
     if (explain && finding.reason) console.log(ui.dim(`  why: ${finding.reason}`));
     if (explain && finding.affected_files?.length) console.log(ui.dim(`  files: ${finding.affected_files.join(", ")}`));
     if (explain && finding.memory_ids?.length) console.log(ui.dim(`  memories: ${finding.memory_ids.join(", ")}`));

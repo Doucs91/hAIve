@@ -197,7 +197,9 @@ function applySurfaceVisibility(root: Command): void {
         "Advanced surface, by family:",
         "  reports:  dashboard · stats                    eval:     eval · benchmark · selftest (alias: bench)",
         "  index:    index code|memories|query            runtime:  observe (hook plumbing)",
-        "  ops:      memory <sub> · sensors · ingest · sync · release · precommit (= enforce check)",
+        "  ops:      memory <sub> · sensors · sync · release · precommit (= enforce check)",
+        "  learn:    ingest --from github-pr <n> (PR review comments → proposed memories)",
+        "            ingest --from eslint|sonar|sonar-api|sarif|npm-audit (scanner findings → memories)",
         "  feedback: report list|submit|dismiss (friction agents hit with Hivelore itself)",
       ]
     : [];

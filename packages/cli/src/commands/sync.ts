@@ -654,8 +654,19 @@ export function registerSync(program: Command): void {
               `embed: code index rebuilt (${codeReport.total} symbols, ${codeReport.added} added, ${codeReport.updated} updated, ${codeReport.removed} removed)`,
             ),
           );
-        } catch {
-          ui.warn("--embed: @hivelore/embeddings not available or index build failed. Install it, then run `hivelore index memories`.");
+        } catch (error) {
+          // "not available or index build failed" told a user whose package WAS installed to install
+          // it — the real cause was a native dep that could not load under their Node version, and
+          // the message hid it. Say which of the two it is, and always print the underlying error.
+          const detail = (error instanceof Error ? error.message : String(error)).split("\n")[0]!.trim();
+          const absent = detail.includes("@hivelore/embeddings") &&
+            /ERR_MODULE_NOT_FOUND|Cannot find (module|package)/.test(detail);
+          ui.warn(
+            absent
+              ? "--embed: @hivelore/embeddings is not installed. Install it (`npm install -g @hivelore/embeddings`), then run `hivelore index memories`."
+              : `--embed: @hivelore/embeddings is installed but the index build failed: ${detail}\n` +
+                "  Reinstall it for this Node version (`npm install -g @hivelore/embeddings`), then run `hivelore doctor`.",
+          );
         }
       }
     });

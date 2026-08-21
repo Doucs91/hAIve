@@ -95,7 +95,7 @@ This repository uses **Hivelore**. Running \`hivelore init\` means the team expe
 Tell the developer to enable the **hivelore** server (e.g. \`hivelore mcp --stdio\` in client config) and restart the client. Do not silently ignore Hivelore.
 `;
 
-const CI_WORKFLOW = `name: hivelore-sync
+export const CI_WORKFLOW = `name: hivelore-sync
 
 on:
   push:
@@ -271,9 +271,10 @@ export function registerInit(program: Command): void {
     )
     .option(
       "--stack <stacks>",
-      `pre-seed validated memory packs for the given stacks (comma-separated).\n` +
+      `pre-seed generic starter memories for the given stacks (comma-separated). OFF by default.\n` +
       `  Supported: ${SUPPORTED_STACKS.join(", ")}.\n` +
-      `  Defaults to 'auto' in autopilot mode (detects from package.json/requirements.txt/go.mod/pom.xml). Pass 'none' to disable.`,
+      `  Pass 'auto' to detect from package.json/requirements.txt/go.mod/pom.xml.\n` +
+      `  These are generic guidance, not repo-specific: an empty corpus is usually the more honest start.`,
     )
     .option(
       "--seed",
@@ -323,10 +324,17 @@ export function registerInit(program: Command): void {
       // when the user passed --no-bootstrap; it's `undefined` when neither flag
       // was given, which we resolve to autopilot's default.
       const wantBootstrap = opts.bootstrap === undefined ? autopilot : opts.bootstrap;
+      // Stack packs are OPT-IN since v0.55.0, autopilot included.
+      //
+      // Seeding them by default filled a brand-new corpus with generic advice nobody wrote for this
+      // repo ("prefer constructor injection over @Autowired"). The first briefing of a real session
+      // then read `thin · must_read=0 useful=0 background=3`, and all three surfaced memories were
+      // stack-pack platitudes: they occupied the briefing without teaching anything, and made an
+      // empty corpus look populated. An empty corpus is more honest — it says plainly that it needs
+      // filling. `hivelore init --stack auto` (or `hivelore memory seed --stack <name>`) still
+      // seeds them for anyone who wants them.
       const wantStack =
-        opts.stack === undefined
-          ? autopilot ? "auto" : undefined
-          : opts.stack === "none" ? undefined : opts.stack;
+        opts.stack === undefined || opts.stack === "none" ? undefined : opts.stack;
       const wantSeed = opts.seed === undefined ? autopilot : opts.seed;
       const seedLimit = Math.max(1, parseInt(opts.seedLimit ?? "20", 10) || 20);
 
@@ -533,6 +541,23 @@ export function registerInit(program: Command): void {
           else if (r.status === "already_configured") ui.info(`hivelore MCP already present in ${r.client} user-level config — left unchanged (this project's config was written above)`);
         }
         if (agentSetup.global_skipped_reason) ui.warn(agentSetup.global_skipped_reason);
+        // MCP clients read their server list once, at startup. Writing the config mid-session
+        // therefore does nothing until the client restarts — and silence about that reads as
+        // "the MCP tools are broken". A field report ran a whole session on the CLI alone for
+        // exactly this reason. Say it plainly, and say what works right now instead.
+        const configuredAny =
+          agentSetup.project_results.some((r) => r.status === "configured") ||
+          agentSetup.global_results.some((r) => r.status === "configured");
+        if (configuredAny) {
+          ui.warn(
+            "Restart your AI client to pick up the MCP server — clients read their server list " +
+            "only at startup, so the hivelore tools stay invisible in a session that is already running.",
+          );
+          ui.info(
+            "Until then the CLI does the same work: `hivelore briefing --task \"...\"`, " +
+            "`hivelore memory save`, `hivelore memory tried`, `hivelore enforce check`.",
+          );
+        }
         ui.info(`Recommended agent mode: ${agentSetup.detection.recommended_mode}`);
         ui.info(agentSetup.detection.recommended_command);
         await ensureGitignoreEntries(root, [

@@ -54,7 +54,12 @@ export function registerMemorySeed(memory: Command): void {
       "    hivelore memory seed              # auto-detect stacks from package.json and seed them\n" +
       "    hivelore memory seed nestjs       # seed a specific stack\n" +
       "    hivelore memory seed --list       # show supported + auto-detected stacks\n" +
-      "    hivelore memory seed --list --json\n",
+      "    hivelore memory seed --list --json\n\n" +
+      "  Richer sources than a generic pack — both propose memories from evidence you already have:\n" +
+      "    hivelore memory seed --git              # lessons mined from revert/hotfix commits\n" +
+      "    hivelore ingest --from github-pr 123    # lessons mined from PR REVIEW COMMENTS\n" +
+      "      A reviewer writing \"careful, the signature must be verified here\" is exactly the\n" +
+      "      knowledge Hivelore wants, already carrying its file and line.\n",
     )
     .option("--git", "seed draft `attempt` lessons from revert/hotfix commits instead of stack packs (absorbed seed-git)")
     .option("--apply", "with --git: write the proposed seeds as draft memories (default: preview)", false)

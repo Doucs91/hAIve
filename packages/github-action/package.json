@@ -8,7 +8,7 @@
     "url": "https://github.com/Doucs91/hivelore.git"
   },
   "scripts": {
-    "build": "tsup src/run.ts --format cjs --out-dir dist --no-splitting --minify",
+    "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

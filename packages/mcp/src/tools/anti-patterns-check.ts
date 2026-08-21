@@ -419,7 +419,8 @@ export async function antiPatternsCheck(
         }
       }
     } catch {
-      // embeddings not installed — silently skip semantic
+      // Semantic is an optional enhancement here: not installed, or installed but its runtime
+      // failed to load — either way the anchor + literal + sensor layers above already ran.
     }
   }
 

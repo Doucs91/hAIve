@@ -21,6 +21,7 @@ import {
   extractTestFilePathsFromCommand,
   hasPendingTestMarker,
   isHarnessErrorOutput,
+  explainSensorRejection,
   judgeProposedSensor,
   loadMemoriesFromDir,
   scrubbedCommandEnv,
@@ -598,16 +599,7 @@ export async function proposeSensor(
   };
 
   if (!verdict.accepted) {
-    const guidance =
-      verdict.reason === "fires-on-current"
-        ? `The sensor matches the CURRENT (correct) code in ${verdict.self_check.fired_on.join(", ")}. Add or tighten the 'absent' companion so correct usage is excluded, then re-propose.`
-        : verdict.reason === "fires-on-correct"
-          ? "The pattern matches the lesson's OWN recommended fix (its `Instead, use:` approach) — it is inverted and would block the correct code, never the mistake. Point the pattern at the FAULTY usage (not the fix), then re-propose."
-          : verdict.reason === "missed-bad-example"
-            ? "The sensor did not match the bad example, so it won't catch the mistake. Adjust the pattern to match the faulty code, then re-propose."
-            : verdict.reason === "brittle"
-              ? `The pattern is brittle (${verdict.brittle}). Use a durable pattern (avoid hardcoded line numbers), then re-propose.`
-              : "Re-propose with a discriminating pattern.";
+    const guidance = explainSensorRejection(verdict, { style: "mcp", memoryId: input.memory_id });
     return {
       accepted: false,
       memory_id: input.memory_id,

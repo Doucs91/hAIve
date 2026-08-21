@@ -35,6 +35,21 @@ jobs:
       - name: Verify build artifacts
         run: pnpm check:artifacts
 
+      # The GitHub Action ships a COMMITTED dist/ and runs from a bare checkout with no
+      # `npm install`. Two things must hold, and neither did before v0.55.0: the committed
+      # bundle matches source, and it executes with nothing else on disk. A published action
+      # that `require()`s an unbundled dependency fails on every consumer's pull request —
+      # `npm pack` cannot see that, only running it can.
+      - name: Verify the committed action bundle is in sync
+        run: git diff --exit-code -- packages/github-action/dist
+
+      - name: Smoke-run the action bundle with no node_modules
+        run: |
+          scratch="$(mktemp -d)"
+          cp packages/github-action/dist/run.js "$scratch/"
+          cd "$scratch"
+          GH_TOKEN=fake GH_REPO=o/r PR_NUMBER=1 node run.js
+
       # Type-check BEFORE tests: tests import built dist, so a clean typecheck on a
       # fresh build catches the source/dist desync that otherwise only shows up as
       # confusing test failures. Blocking (no continue-on-error) so regressions fail CI.

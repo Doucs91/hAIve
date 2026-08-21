@@ -13,6 +13,7 @@ import {
   sensorPromotedAtMap,
   findProjectRoot,
   isRetiredMemory,
+  explainSensorRejection,
   judgeProposedSensor,
   loadConfig,
   loadSensorLedger,
@@ -473,10 +474,19 @@ export function registerSensors(program: Command): void {
       "  trusting it to block. Mirrors the MCP `propose_sensor` tool (the agent-authored path).\n\n" +
       "  A `block` proposal is accepted ONLY if it is not brittle, stays SILENT on the current code,\n" +
       "  and FIRES on the bad example. Rejected proposals are not written — fix and re-run.\n\n" +
+      "  Four kinds, so a rule does not have to be expressible as a regex (--kind):\n" +
+      "    regex  text pattern on the added lines (default)\n" +
+      "    ast    STRUCTURAL match — comments and strings cannot false-positive\n" +
+      "    shell  any command; non-zero exit = the lesson fired\n" +
+      "    test   the team's own test as the oracle (add --red-ref to prove it catches the incident)\n" +
+      "  shell/test route an analyser you already run (Sonar, ESLint, ArchUnit, Semgrep, your suite):\n" +
+      "  Hivelore does not re-implement the analysis, it carries the rule's justification.\n\n" +
       "  Example:\n" +
       "    hivelore sensors propose <memory-id> \\\n" +
       "      --pattern 'stripe\\.paymentIntents\\.create' --absent 'idempotencyKey' \\\n" +
-      "      --bad-example 'stripe.paymentIntents.create({ amount })'",
+      "      --bad-example 'stripe.paymentIntents.create({ amount })'\n" +
+      "    hivelore sensors propose <memory-id> --kind shell \\\n" +
+      "      --command 'npx archunit-cli check --rule no-http-in-transactional'",
     )
     .argument("<memory-id>", "memory id to attach the sensor to")
     .option("--kind <kind>", "regex (default) | ast (structural — comments/strings can't false-positive) | shell | test (route the team's own oracle)", "regex")
@@ -632,15 +642,7 @@ export function registerSensors(program: Command): void {
       }
       if (!verdict.accepted) {
         ui.error(`Rejected (${verdict.reason}).`);
-        if (verdict.reason === "fires-on-current") {
-          ui.warn(`Fires on the CURRENT correct code in: ${verdict.self_check.fired_on.join(", ")}. Add/tighten --absent, then re-run.`);
-        } else if (verdict.reason === "fires-on-correct") {
-          ui.warn("Inverted: the pattern matches the lesson's OWN recommended fix (its `Instead, use:` approach) — it would block correct code, never the mistake. Point --pattern at the FAULTY usage, then re-run.");
-        } else if (verdict.reason === "missed-bad-example") {
-          ui.warn("Did not match the bad example — the pattern won't catch the mistake. Adjust --pattern, then re-run.");
-        } else if (verdict.reason === "brittle") {
-          ui.warn(`Pattern is brittle (${verdict.brittle}). Use a durable pattern, then re-run.`);
-        }
+        ui.warn(explainSensorRejection(verdict, { style: "cli", memoryId: id }));
         process.exitCode = 1;
         return;
       }

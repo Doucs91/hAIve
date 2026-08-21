@@ -235,6 +235,24 @@ export interface HaiveConfig {
      */
     humanCommits?: "relaxed" | "strict";
     /**
+     * Whether the PROCESS gates (briefing-loaded, session-recap, decision-coverage, bootstrap) may
+     * REFUSE a push, or only report.
+     *
+     *   - "warn" (default): they are always advisory. Only deterministic, code-bound findings —
+     *     block sensors, anti-pattern blocks, stale anchors, artifact hygiene — can refuse.
+     *   - "block": the pre-v0.55.0 behaviour, where an agent's push is refused for not having
+     *     written a session recap.
+     *
+     * The default changed in v0.55.0 on field evidence. A user pushing tested code with a green
+     * SonarQube gate and zero violations was refused twice, both times entirely on process
+     * penalties: `briefing-missing (−35)`, `session-recap-missing (−20)`, `bootstrap-incomplete (−5)`.
+     * Not one penalty was about the code. The predictable response to that is `--no-verify`, which
+     * costs the developer the WHOLE gate — including the sensors, the part that actually protects.
+     * A gate routinely bypassed protects nothing, so the gate now spends its refusals only where it
+     * has deterministic evidence, and asks for the rest.
+     */
+    processGate?: "warn" | "block";
+    /**
      * Pre-commit/pre-push decision-coverage behaviour. When true (default), the gate SURFACES the
      * relevant anchored decisions/policies itself and records them in the session marker at commit
      * time — no separate `hivelore briefing` step required. Set false for the strict legacy behaviour

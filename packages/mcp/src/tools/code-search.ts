@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { loadCodeMap } from "@hivelore/core";
+import { runSemantic } from "../embeddings-runtime.js";
 import type { HaiveContext } from "../context.js";
 
 export const CodeSearchInputSchema = {
@@ -53,23 +54,19 @@ export async function codeSearch(
   input: CodeSearchInput,
   ctx: HaiveContext,
 ): Promise<CodeSearchOutput> {
-  let mod: typeof import("@hivelore/embeddings");
-  try {
-    mod = await import("@hivelore/embeddings");
-  } catch {
-    return {
-      available: false,
-      hits: [],
-      notice:
-        "@hivelore/embeddings is not installed. Install it (`pnpm add @hivelore/embeddings`) " +
-        "and run `hivelore index code-search` to enable semantic code search.",
-    };
+  // Load AND search inside one guard: the search is where the transformers runtime initialises, so
+  // a broken native install threw out of the tool instead of reporting `available: false`.
+  const outcome = await runSemantic(async (mod) => ({
+    mod,
+    result: await mod.codeSemanticSearch(ctx.paths, input.query, {
+      limit: input.k,
+      minScore: input.min_score,
+    }),
+  }));
+  if (!outcome.ok) {
+    return { available: false, hits: [], notice: `${outcome.notice} Then run \`hivelore index code-search\`.` };
   }
-
-  const result = await mod.codeSemanticSearch(ctx.paths, input.query, {
-    limit: input.k,
-    minScore: input.min_score,
-  });
+  const { mod, result } = outcome.value;
 
   if (!result) {
     return {

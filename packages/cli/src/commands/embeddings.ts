@@ -106,10 +106,13 @@ function attachSemanticCommands(embeddings: Command, naming: { memoriesVerb: str
 async function loadEmbeddings() {
   try {
     return await import("@hivelore/embeddings");
-  } catch {
-    ui.error(
-      "Could not load @hivelore/embeddings. Run: npm install -g @hivelore/embeddings  (or `pnpm build` in the monorepo)",
-    );
+  } catch (error) {
+    // Print the real cause. "Could not load" plus an install command is actively misleading when
+    // the package IS installed and it is a native dependency that failed for this Node version.
+    const detail = (error instanceof Error ? error.message : String(error)).split("\n")[0]!.trim();
+    ui.error(`Could not load @hivelore/embeddings: ${detail}`);
+    ui.info("Install or reinstall it for this Node version: npm install -g @hivelore/embeddings");
+    ui.info("(in the monorepo: `pnpm build`)");
     process.exit(1);
   }
 }

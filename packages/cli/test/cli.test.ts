@@ -125,7 +125,10 @@ describe("Hivelore CLI integration", () => {
     expect(enforcementWorkflow).toContain("HIVELORE_BASE_SHA");
     expect(enforcementWorkflow).toContain("HIVELORE_HEAD_SHA");
     expect(enforcementWorkflow).toContain("<!-- haive:prevention-receipt -->");
-    expect(enforcementWorkflow).toContain("hivelore stats receipt --since 7d --json");
+    expect(enforcementWorkflow).toContain("hivelore stats receipt --since 7d --comment");
+    // The comment body is rendered by the CLI, never by a program inlined in YAML — an embedded
+    // multi-line jq script is what made this generated workflow unparseable before v0.55.0.
+    expect(enforcementWorkflow).not.toContain("jq -nr");
     expect(enforcementWorkflow).toContain("if: always() && github.event_name == 'pull_request'");
     expect(enforcementWorkflow).toContain("gh api --method PATCH");
     const config = JSON.parse(await readFile(path.join(workDir, ".ai/hivelore.config.json"), "utf8")) as {
@@ -424,7 +427,9 @@ describe("Hivelore CLI integration", () => {
         JSON.stringify({ dependencies: { next: "latest", react: "latest" } }, null, 2),
         "utf8",
       );
-      await run(repo, ["init", "--no-mcp-setup", "--dir", repo]);
+      // Stack packs are opt-in since v0.55.0 (an empty corpus is the honest default), so ask for
+      // them explicitly — which also keeps the opt-in path covered.
+      await run(repo, ["init", "--no-mcp-setup", "--stack", "auto", "--dir", repo]);
       const { stdout } = await run(repo, ["doctor", "--json", "--dir", repo]);
       const report = JSON.parse(stdout) as { findings: Array<{ code: string; severity: string }> };
 
@@ -1438,7 +1443,7 @@ describe("Hivelore CLI integration", () => {
     }
   });
 
-  it("bootstrap gate warns locally but blocks at a sharing point on a cold codebase, then clears once filled", async () => {
+  it("bootstrap gate reports on a cold codebase, blocks only when opted in, then clears once filled", async () => {
     const repo = await mkdtemp(path.join(tmpdir(), "haive-bootstrap-gate-"));
     try {
       await exec("git", ["init"], { cwd: repo });
@@ -1463,9 +1468,9 @@ describe("Hivelore CLI integration", () => {
       codeMap.files["ignored-ref/c.ts"] = sampleEntry;
       await writeFile(codeMapFile, JSON.stringify(codeMap, null, 2), "utf8");
 
-      // Stage a production-code change on a cold corpus. The gate binds the BLOCK to sharing points:
-      //  - pre-commit (local iteration) → warn (must not block quick local work / train --no-verify)
-      //  - pre-push  (a sharing point) → error (the baseline must exist before code is shared)
+      // Stage a production-code change on a cold corpus. Bootstrap is a PROCESS gate: since v0.55.0
+      // it reports at every stage and refuses at none, unless the repo opts in with
+      // enforcement.processGate="block" — which this test then does, to keep the strict path covered.
       await writeFile(path.join(repo, "packages/api/a.ts"), "export function getUser(){ return 2 }\n", "utf8");
       await exec("git", ["add", "packages/api/a.ts"], { cwd: repo });
       const preCommit = JSON.parse(
@@ -1475,7 +1480,21 @@ describe("Hivelore CLI integration", () => {
       const prePush = JSON.parse(
         (await runAllowFailure(repo, ["enforce", "check", "--stage", "pre-push", "--json", "--dir", repo])).stdout,
       ) as { findings: Array<{ code: string; severity: string }> };
-      expect(prePush.findings.find((f) => f.code === "bootstrap-incomplete")?.severity).toBe("error");
+      expect(prePush.findings.find((f) => f.code === "bootstrap-incomplete")?.severity).toBe("warn");
+
+      // Opted in, the cold baseline blocks the sharing point again.
+      const strictCfgPath = path.join(repo, ".ai", "hivelore.config.json");
+      const strictCfg = JSON.parse(await readFile(strictCfgPath, "utf8")) as { enforcement?: Record<string, unknown> };
+      await writeFile(
+        strictCfgPath,
+        JSON.stringify({ ...strictCfg, enforcement: { ...strictCfg.enforcement, processGate: "block" } }, null, 2),
+        "utf8",
+      );
+      const prePushStrict = JSON.parse(
+        (await runAllowFailure(repo, ["enforce", "check", "--stage", "pre-push", "--json", "--dir", repo])).stdout,
+      ) as { findings: Array<{ code: string; severity: string }> };
+      expect(prePushStrict.findings.find((f) => f.code === "bootstrap-incomplete")?.severity).toBe("error");
+      await writeFile(strictCfgPath, JSON.stringify(strictCfg, null, 2), "utf8");
 
       // Fill the knowledge layer: real project-context + an anchored memory with a sensor on the area.
       await writeFile(
@@ -1596,7 +1615,7 @@ describe("Hivelore CLI integration", () => {
     }
   });
 
-  it("relaxes process gates to warnings for human commits (no agent signals), keeps them for agents", async () => {
+  it("keeps process gates advisory by default, and blocks only when processGate is set to block", async () => {
     const repo = await mkdtemp(path.join(tmpdir(), "haive-human-relax-"));
     try {
       await exec("git", ["init", "-b", "main"], { cwd: repo });
@@ -1620,31 +1639,51 @@ describe("Hivelore CLI integration", () => {
       expect(agentCommit.actor).toContain("agent");
       expect(agentCommit.findings.find((f) => f.code === "briefing-missing")?.severity).toBe("warn");
 
-      // SHARING point (pre-push): the agent IS bound — briefing-missing is a blocking error there.
+      // SHARING point (pre-push), default config: process gates are ADVISORY for everyone,
+      // agents included (enforcement.processGate defaults to "warn" since v0.55.0). A push carrying
+      // clean, tested code must not be refused because no session recap was written — that refusal
+      // teaches `--no-verify`, which costs the developer the sensors too.
       const agent = JSON.parse(
         (await runAllowFailure(repo, ["enforce", "check", "--stage", "pre-push", "--json", "--dir", repo])).stdout,
-      ) as { actor?: string; findings: Array<{ code: string; severity: string }> };
+      ) as { actor?: string; should_block: boolean; findings: Array<{ code: string; severity: string; message: string }> };
       expect(agent.actor).toContain("agent");
-      expect(agent.findings.find((f) => f.code === "briefing-missing")?.severity).toBe("error");
+      const advisory = agent.findings.find((f) => f.code === "briefing-missing");
+      expect(advisory?.severity).toBe("warn");
+      expect(advisory?.message).toContain("processGate");
+      // Nothing deterministic fired, so nothing refuses the push.
+      expect(agent.should_block).toBe(false);
 
-      // Human context (HAIVE_AGENT=0 override) at the sharing point: relaxed to a warning.
+      // The score is still reported when it is under target, but it is a measurement, never a verdict.
+      const scoreFinding = agent.findings.find((f) => f.code === "enforcement-score-below-threshold");
+      if (scoreFinding) {
+        expect(scoreFinding.severity).toBe("warn");
+        expect(scoreFinding.message).toContain("does not block");
+      }
+
+      // Human context (HAIVE_AGENT=0 override): also advisory, and still labelled as a human actor.
       const human = JSON.parse(
         (await runAllowFailure(repo, ["enforce", "check", "--stage", "pre-push", "--json", "--dir", repo], { HAIVE_AGENT: "0" })).stdout,
       ) as { actor?: string; findings: Array<{ code: string; severity: string; message: string }> };
       expect(human.actor).toContain("human");
-      const relaxed = human.findings.find((f) => f.code === "briefing-missing");
-      expect(relaxed?.severity).toBe("warn");
-      expect(relaxed?.message).toContain("humanCommits");
+      expect(human.findings.find((f) => f.code === "briefing-missing")?.severity).toBe("warn");
 
-      // humanCommits=strict binds humans too at the sharing point.
+      // Opt back in: processGate="block" restores the pre-v0.55.0 gate for teams that want it,
+      // and humanCommits still carves humans out of it.
       const cfgPath = path.join(repo, ".ai", "hivelore.config.json");
       const cfg = JSON.parse(await readFile(cfgPath, "utf8")) as { enforcement?: Record<string, unknown> };
-      cfg.enforcement = { ...cfg.enforcement, humanCommits: "strict" };
+      cfg.enforcement = { ...cfg.enforcement, processGate: "block" };
       await writeFile(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
-      const strict = JSON.parse(
+      const blocking = JSON.parse(
+        (await runAllowFailure(repo, ["enforce", "check", "--stage", "pre-push", "--json", "--dir", repo])).stdout,
+      ) as { findings: Array<{ code: string; severity: string; message: string }> };
+      expect(blocking.findings.find((f) => f.code === "briefing-missing")?.severity).toBe("error");
+
+      const relaxedHuman = JSON.parse(
         (await runAllowFailure(repo, ["enforce", "check", "--stage", "pre-push", "--json", "--dir", repo], { HAIVE_AGENT: "0" })).stdout,
-      ) as { findings: Array<{ code: string; severity: string }> };
-      expect(strict.findings.find((f) => f.code === "briefing-missing")?.severity).toBe("error");
+      ) as { findings: Array<{ code: string; severity: string; message: string }> };
+      const relaxed = relaxedHuman.findings.find((f) => f.code === "briefing-missing");
+      expect(relaxed?.severity).toBe("warn");
+      expect(relaxed?.message).toContain("humanCommits");
     } finally {
       await rm(repo, { recursive: true, force: true });
     }

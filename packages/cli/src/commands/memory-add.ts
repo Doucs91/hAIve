@@ -252,9 +252,16 @@ export function registerMemoryAdd(memory: Command): void {
       // (skill, glossary, session_recap are procedure/reference types that don't need code anchors)
       const typeNeedsAnchor = !["skill", "glossary", "session_recap"].includes(opts.type as string);
       if (anchorPaths.length === 0 && typeNeedsAnchor) {
+        // Don't just say "add anchors" and leave the author to go find them — the memory text
+        // usually names the files it is about. Offer those, prefilled, so the fix is one paste
+        // rather than a lookup.
+        const suggested = suggestAnchorPathsFromBody(body, root);
         ui.warn(
           `This memory has no anchor paths — staleness cannot be detected automatically.` +
-          `\n  Add file anchors: hivelore memory update ${frontmatter.id} --paths <file1,file2>`,
+          (suggested.length > 0
+            ? `\n  These files are named in the body and exist here:` +
+              `\n    hivelore memory update ${frontmatter.id} --paths ${suggested.join(",")}`
+            : `\n  Add file anchors: hivelore memory update ${frontmatter.id} --paths <file1,file2>`),
         );
       }
 
@@ -377,4 +384,28 @@ function slugify(value: string): string {
     .replace(/^-|-$/g, "")
     .slice(0, 60);
   return slug || "memory";
+}
+
+/**
+ * Pull path-like tokens out of a memory body and keep the ones that really exist in the repo.
+ *
+ * Anchors are what make staleness detection possible, but the warning that they were missing used
+ * to end at "add file anchors: … --paths <file1,file2>" — leaving the author to go and look up
+ * paths they had, in most cases, just written into the body. Deliberately conservative: a token
+ * only survives if it has a directory separator, an extension, and a matching file on disk. A wrong
+ * anchor is worse than none (it goes stale immediately), so guessing is never worth it.
+ */
+export function suggestAnchorPathsFromBody(body: string, root: string, limit = 4): string[] {
+  const candidates = body.match(/[\w.@-]+(?:\/[\w.@-]+)+\.\w{1,6}/g) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of candidates) {
+    const rel = raw.replace(/^\.\//, "");
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    if (!existsSync(path.join(root, rel))) continue;
+    out.push(rel);
+    if (out.length >= limit) break;
+  }
+  return out;
 }
