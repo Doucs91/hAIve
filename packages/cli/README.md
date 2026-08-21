@@ -84,10 +84,17 @@ This keeps Hivelore from feeling like a grab bag: day-to-day users see the core 
 
 ### `hivelore init`
 
-Initialize the `.ai/` structure in a project. **Autopilot mode is ON by default** and now installs strict enforcement gates by default.
+Initialize the `.ai/` structure in a project. **Autopilot mode is ON by default** and installs the git hooks and CI gate.
+
+What the gate refuses is set by `enforcement.posture` — **`balanced`** by default: deterministic,
+code-bound findings only (a validated sensor firing on your diff, an anchored anti-pattern, a stale
+anchor on a file you touched). The process gates — briefing loaded, session recap, decision coverage,
+bootstrap — report but never refuse. Use `posture: "strict"` to enforce the workflow too, or
+`"advisory"` to report everything and refuse nothing.
 
 ```bash
 hivelore init                    # Autopilot: policy config, hooks, CI, MCP setup, code-map
+hivelore init --stack auto       # Opt in to generic starter packs for the detected stack
 hivelore init --manual           # Manual mode: you approve every memory yourself
 hivelore init --no-bridges       # Skip native bridge generation (CLAUDE.md, AGENTS.md, etc.)
 hivelore init --dir /other/path  # Initialize in a specific directory
@@ -97,14 +104,14 @@ hivelore init --yes              # Also approve user-level AI client MCP configu
 **Autopilot mode** (default):
 - Memories are saved directly as `validated` (no approval cycle)
 - Git hooks installed automatically (`hivelore enforce check` gates commits/pushes)
-- CI workflows generated (`haive-enforcement.yml` and sync workflow)
+- CI workflows generated (`hivelore-enforcement.yml` and sync workflow)
 - Initial code-map built (`.ai/code-map.json`) for symbol lookup
 - Session recaps saved automatically when the MCP server exits
-- Configuration stored in `.ai/haive.config.json`
+- Configuration stored in `.ai/hivelore.config.json`
 
 **Manual mode** (`--manual`):
 - Memories start as `proposed` and require explicit approval (`hivelore memory approve`)
-- No automatic hooks or CI — set up manually with `hivelore install-hooks` and `hivelore init --with-ci`
+- No automatic hooks or CI — set up manually with `hivelore enforce install` and `hivelore init --with-ci`
 - Full control over when knowledge becomes team policy
 
 **What it creates:**
@@ -113,7 +120,7 @@ hivelore init --yes              # Also approve user-level AI client MCP configu
 your-project/
 ├── .ai/
 │   ├── project-context.md        # Shared project overview (fill via bootstrap_project MCP prompt)
-│   ├── haive.config.json         # Autopilot settings
+│   ├── hivelore.config.json      # Policy + autopilot settings
 │   ├── modules/                  # Per-component context files
 │   └── memories/
 │       ├── personal/             # Private to one developer
@@ -525,14 +532,18 @@ hivelore sync --quiet                  # Minimal output (for git hooks)
 
 ---
 
-### `hivelore install-hooks`
+### `hivelore enforce install`
 
-Install git hooks so `hivelore sync` runs automatically after every pull/merge.
+Install the blocking git hooks (pre-commit, pre-push, commit-msg) plus the sync hooks that run
+`hivelore sync` after every pull/merge, and write the CI enforcement workflow.
 
 ```bash
-hivelore install-hooks         # Install post-merge and post-rewrite hooks
-hivelore install-hooks --dir /path/to/project
+hivelore enforce install                  # Hooks + CI enforcement workflow
+hivelore enforce install --dir /path/to/project
 ```
+
+> `hivelore install-hooks` still works as a hidden back-compat alias; `enforce install` is the
+> canonical command.
 
 ---
 
