@@ -18,7 +18,7 @@ import type { AntiPatternGate } from "./config.js";
  *
  * Hivelore already has the pieces (impact scoring, usage tracking, sensors, retirement,
  * decay) but no single non-interactive snapshot that an agent, a CI job, or a human
- * can read in one shot. `hivelore tui` exists but needs a TTY; `hivelore stats` only covers
+ * can read in one shot. `hivelore stats` only covers
  * tool-call volume. This module aggregates the full picture deterministically so the
  * CLI can print it (or emit JSON). Pure: no I/O, unit-tested in `test/dashboard.test.ts`.
  */

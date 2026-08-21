@@ -573,19 +573,23 @@ The code map lets AI agents find where a function lives without grepping — dra
 
 ---
 
-### `hivelore tui`
+### `hivelore dashboard`
 
-Interactive terminal dashboard with 3 screens — browse, filter, and manage memories without leaving the terminal.
+Non-interactive observability snapshot of the memory corpus — a one-shot rollup an agent or CI can
+read without a TTY: inventory, impact tiers and top memories, sensors (and which ones fired), health
+(stale / anchorless / pending / prune candidates), decay, and corpus weight.
 
 ```bash
-hivelore tui               # Open the TUI
-hivelore tui --dir /path/to/project
+hivelore dashboard                 # Human-readable snapshot
+hivelore dashboard --json          # Pipe into other tooling
+hivelore dashboard --top 20        # Rows per top-list (default 10)
+hivelore dashboard --dormant-days 90
 ```
 
-**Screens (switch with `1` `2` `3`):**
+For interactive review of individual memories, use `hivelore memory list --status proposed` and
+`hivelore memory approve|reject <id>`.
 
-| Screen | Key | What it shows |
-|---|---|---|
+---|---|---|
 | Memories | `1` | Full list + preview panel, filter by status (Tab), actions |
 | Health | `2` | Stale memories, pending review, anchorless memories |
 | Stats | `3` | Top-read memories, decaying (>90d unused), totals by status |
@@ -622,58 +626,19 @@ One recap is kept per scope (topic-upsert: `revision_count` increments on each c
 
 ---
 
-## Memory lifecycle
+## Everything else
 
-```
-hivelore memory save       → status: draft
-hivelore memory promote    → status: proposed  (personal → team)
-hivelore memory approve    → status: validated
-hivelore sync              → status: stale     (if anchor broken)
-hivelore memory reject     → status: rejected
-```
+This page is the **command reference**. The concepts behind them — what the gate enforces and why,
+the sensor doctrine, cold start, the `.ai/` layout, module contexts, the MCP tool and prompt
+reference — live in one place so they cannot drift apart:
 
-Validated team memories are loaded into every `get_briefing` call and injected into bridge files.
-
----
-
-## Multi-component projects
-
-For projects with frontend + backend (or microservices), create one module context per component:
+**→ [Full documentation](https://github.com/Doucs91/hivelore#readme)**
 
 ```bash
-# After hivelore init, create module context files:
-mkdir -p .ai/modules/backend .ai/modules/frontend
-
-cat > .ai/modules/backend/context.md << 'EOF'
-# Module: backend
-- Spring Boot, Java 17, PostgreSQL
-- Always filter by tenantId in every query
-- Never modify existing Flyway migrations
-EOF
-
-cat > .ai/modules/frontend/context.md << 'EOF'
-# Module: frontend
-- React 19, TypeScript, TanStack Query
-- All API calls go through hooks in features/<domain>/api/
-- Env vars must be prefixed with VITE_
-EOF
+hivelore --help                    # the golden path
+hivelore --advanced --help         # every command, grouped by family
+hivelore <command> --help          # flags and examples for one command
 ```
-
-`get_briefing` auto-loads the relevant module context based on the files the agent is editing.
-
----
-
-## Semantic search (optional)
-
-Install `@hivelore/embeddings` for similarity-based memory retrieval:
-
-```bash
-npm install -g @hivelore/embeddings
-hivelore index memories            # First run downloads the model (~110MB)
-hivelore index query "payment retry logic"
-```
-
-From MCP: set `semantic: true` on `mem_search` or `get_briefing`.
 
 ---
 

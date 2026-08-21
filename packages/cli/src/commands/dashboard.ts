@@ -24,7 +24,7 @@ export function registerDashboard(program: Command): void {
     .command("dashboard")
     .description(
       "Non-interactive observability snapshot of the memory corpus.\n\n" +
-      "  One-shot rollup an agent or CI can read (unlike `hivelore tui`, no TTY needed):\n" +
+      "  One-shot rollup an agent or CI can read — no TTY needed:\n" +
       "  inventory, impact tiers + top memories, sensors (and which ones fired),\n" +
       "  health (stale / anchorless / pending / prune candidates), decay, and corpus weight.\n" +
       "  Use --json to pipe it into other tooling.",

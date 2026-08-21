@@ -140,7 +140,7 @@ export function registerMemoryDigest(program: Command): void {
 
       lines.push(``);
       lines.push(
-        `> _To take action: \`hivelore memory approve <id>\`, \`hivelore memory reject <id>\`, or open \`hivelore tui\` for interactive review._`,
+        `> _To take action: \`hivelore memory approve <id>\`, \`hivelore memory reject <id>\`._`,
       );
 
       const digest = lines.join("\n");

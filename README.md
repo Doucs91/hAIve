@@ -372,6 +372,10 @@ on your change.
 diagnostics, benchmarks) is one `hivelore --advanced --help` away — the focused surface is deliberate,
 not a missing feature.
 
+> **Exhaustive command manual:** [`packages/cli/README.md`](./packages/cli/README.md) documents every
+> command with its flags and examples. It is the reference; this page is the concepts. Each claim
+> lives in exactly one of the two.
+
 | Stage | Command | What it does |
 |---|---|---|
 | **Set up** | `hivelore init` | Create `.ai/`, bridge files, MCP config, hooks, CI |

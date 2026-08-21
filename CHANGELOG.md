@@ -6,6 +6,44 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.2] — Documentation is a deliverable, so it gets checked like one
+
+Both READMEs had drifted six weeks behind the code and described a gate that no longer exists. The
+fix is not the edit — it is that nothing was comparing the prose to the source.
+
+### Merged: each claim now lives in exactly one README
+
+The two pages serve different purposes — the root README is the concepts, `packages/cli/README.md`
+(the npm landing page) is the exhaustive command manual, 83% of which is the command reference and
+its unique value. They overlapped only in their *claims*, which is exactly where they drifted into
+saying different, both-wrong things.
+
+The 55 duplicated conceptual lines were removed from the npm page and replaced with a link. They are
+not synchronised; they exist once. The npm page keeps absolute asset URLs because relative paths do
+not resolve on npmjs.com — the real reason the two files cannot simply be one.
+
+### `hivelore tui` never existed
+
+The npm README documented it with its own section, a screen table and a keybinding table. There is
+no `registerTui`; invoking it falls through to the root usage banner. The command is
+`hivelore dashboard`, and **the CLI's own help text cited the phantom too** — `dashboard --help`,
+`memory digest` output, and a core doc-comment all pointed at it. All corrected.
+
+### New: `packages/cli/test/docs-accuracy.test.ts`
+
+Covers the failure modes that actually occurred, and was verified to fail on each:
+
+- **Phantom commands** — every `hivelore <cmd>` cited is INVOKED, not looked up in `--help`. Hidden
+  back-compat aliases (`install-hooks`) are real and absent from help; a command that was never
+  registered falls through to the usage banner. Only invocation tells the two apart.
+- **Non-existent config keys** — every `enforcement.<key>` must exist in `config.ts`.
+- **Pre-rename filenames** — `haive.config.json` and `haive-enforcement.yml` were renamed in v0.51
+  and survived in the npm README for six weeks.
+- **Undocumented MCP tools** — the default profile's tool list must be fully documented; 4 of 15
+  were missing, including `propose_sensor`, cited three times in prose as the differentiator.
+- **Re-duplication** — the conceptual sections must not reappear on the npm page.
+
+
 ## [0.57.1] — Churn needs a real sample, or it is not a measurement
 
 `v0.57.0` scored 96 locally and **94 in CI on the same commit**, and the eval gate caught it.
