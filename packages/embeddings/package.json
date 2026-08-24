@@ -1,6 +1,6 @@
 {
   "name": "@hivelore/embeddings",
-  "version": "0.57.3",
+  "version": "0.57.4",
   "description": "Hivelore embeddings - local semantic ranking for agent briefings and code search",
   "license": "Apache-2.0",
   "repository": {

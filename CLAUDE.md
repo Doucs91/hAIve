@@ -50,8 +50,9 @@ Several agents **and** the human (Sady) work on this repo in parallel with manua
 4. If bumping: create the matching git tag `vX.Y.Z`.
 5. `git push` **code and the new tag** (`git push && git push origin vX.Y.Z`). Do **not** use `git push --tags` — it tries to push every local tag and fails if an old one (e.g. `v0.4.0`) already differs on the remote; push only the tag you just created.
 6. After push, verify the GitHub Actions runs for HEAD and wait until every workflow passes (`gh run list --commit $(git rev-parse HEAD)`, then `gh run watch <run-id> --exit-status` for pending runs).
+7. If bumping: once CI is green, **create the GitHub Release for the tag** — `gh release create vX.Y.Z --verify-tag --latest --title "…" --notes-file <notes>`. A tag is not a Release: listing and scoring tools read Releases, and the repo went four months with 190 tags and none. Notes come from the `CHANGELOG.md` section for that version. Releases are **not** cumulative — never backfill old tags; only the current version gets one.
 
-**BOUNDARY: agents NEVER run `npm publish`. npm publication is done by the human (Sady).**
+**BOUNDARY: agents NEVER run `npm publish`. npm publication is done by the human (Sady).** Creating the GitHub Release is *not* publication and is inside the boundary — it announces a tag that is already public.
 
 **Before final response:** run `hivelore enforce finish`. If it blocks, fix the reported commit/version/tag/push/pipeline issue before saying the task is done.
 

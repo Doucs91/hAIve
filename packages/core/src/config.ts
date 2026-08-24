@@ -304,6 +304,16 @@ export interface HaiveConfig {
      */
     npmPublishCheck?: "off" | "warn";
     /**
+     * Whether `hivelore enforce finish` checks that tagged versions became GitHub Releases.
+     * Default on; set "off" for repos that deliberately tag without releasing.
+     *
+     * It never blocks, and it never asks you to backfill: only tags NEWER than the oldest existing
+     * Release are reported as gaps, so adopting Releases mid-history does not produce a warning
+     * that no action can clear. A repo with tags and no Release at all gets one info line — tags
+     * are not Releases, and listing/scoring tools read Releases.
+     */
+    githubReleaseCheck?: "off" | "warn";
+    /**
      * How `hivelore enforce finish` reacts to hard failures observed this session that were never
      * captured as a lesson (`mem_tried`):
      *   - off:   ignore

@@ -657,7 +657,7 @@ hivelore briefing [--task <text>] [--files] [--json]   # Print context + relevan
 hivelore run -- <agent command>                  # Wrap any CLI agent in Hivelore session
 hivelore enforce check [--stage pre-commit]      # Policy gate
 hivelore enforce ci                              # CI entrypoint
-hivelore enforce finish                          # Final agent-exit gate: commit/push + version/tag protocol
+hivelore enforce finish                          # Final agent-exit gate: commit/push, version/tag, CI, npm + GitHub Release
 hivelore coverage [--source git|agent|both]      # Find changed files no memory covers
 hivelore sync [--since <ref>] [--embed]          # Verify anchors + auto-promote
 hivelore sensors list/check/export/promote       # Operate executable memory sensors

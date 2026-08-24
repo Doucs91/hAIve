@@ -15,6 +15,8 @@
  * Pure: the registry lookup and the tag listing happen in the caller.
  */
 
+import { compareVersions } from "./version-order.js";
+
 export type NpmPublicationCode =
   | "npm-published"
   | "npm-publish-pending"
@@ -38,16 +40,6 @@ export interface NpmPublicationVerdict {
   severity: "ok" | "info" | "warn";
   message: string;
   fix?: string;
-}
-
-function compareVersions(a: string, b: string): number {
-  const pa = a.split(/[.-]/).map((p) => Number.parseInt(p, 10) || 0);
-  const pb = b.split(/[.-]/).map((p) => Number.parseInt(p, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length, 3); i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
 }
 
 export function classifyNpmPublication(input: NpmPublicationInput): NpmPublicationVerdict {

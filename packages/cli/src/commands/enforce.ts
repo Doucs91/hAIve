@@ -25,6 +25,8 @@ import {
   detectAgentContext,
   loadMemoriesFromDir,
   classifyNpmPublication,
+  classifyGithubRelease,
+  compareVersions,
   buildBaselineHealthFinding,
   computeBaselineHealth,
   decideVerdict,
@@ -831,6 +833,7 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
 
   findings.push(...await verifyGithubActionsForHead(root, status));
   findings.push(...await verifyNpmPublication(root, version, config));
+  findings.push(...await verifyGithubRelease(root, version, config));
   return finishReport(root, initialized, mode, findings, config);
 }
 
@@ -873,6 +876,76 @@ async function verifyNpmPublication(
 }
 
 /**
+ * Announcement side of the release chain. The verdict logic is pure and lives in
+ * `core/github-release.ts`; this lists the tags and asks GitHub which of them have a Release.
+ *
+ * Best-effort, exactly like the npm check: no `gh`, no auth, no network or a non-GitHub remote all
+ * resolve to "cannot tell". Off with `enforcement.githubReleaseCheck: "off"`.
+ */
+async function verifyGithubRelease(
+  root: string,
+  version: string,
+  config: HaiveConfig,
+): Promise<EnforcementFinding[]> {
+  if (config.enforcement?.githubReleaseCheck === "off") return [];
+
+  const taggedVersions = await versionTags(root);
+  if (taggedVersions.length === 0) return [];
+
+  const verdict = classifyGithubRelease({
+    localVersion: version,
+    releasedVersions: await publishedReleaseVersions(root),
+    taggedVersions,
+    releaseHint: `\`gh release create v${version} --verify-tag --notes-file <notes>\``,
+  });
+  if (!verdict) return [];
+
+  return [{
+    severity: verdict.severity,
+    code: verdict.code,
+    message: verdict.message,
+    ...(verdict.fix ? { fix: verdict.fix } : {}),
+    ...(verdict.severity === "warn" ? { impact: 10 } : {}),
+  }];
+}
+
+/**
+ * Versions that have a published GitHub Release, or null when the question could not be asked.
+ *
+ * Drafts are excluded deliberately: a draft is not visible to anyone but the maintainer, so
+ * counting it as shipped would report a release nobody can install. `--json` output is parsed
+ * rather than the human table, which changes format between `gh` versions.
+ */
+async function publishedReleaseVersions(root: string): Promise<string[] | null> {
+  const raw = await runCommand(
+    "gh",
+    ["release", "list", "--limit", "200", "--json", "tagName,isDraft"],
+    root,
+  ).catch(() => null);
+  if (raw === null) return null;
+
+  try {
+    const rows = JSON.parse(raw) as { tagName?: unknown; isDraft?: unknown }[];
+    if (!Array.isArray(rows)) return null;
+    return rows
+      .filter((r) => r.isDraft !== true && typeof r.tagName === "string")
+      .map((r) => (r.tagName as string).trim().replace(/^v/, ""))
+      .filter((v) => /^\d+\.\d+\.\d+$/.test(v));
+  } catch {
+    return null;
+  }
+}
+
+/** Every `vX.Y.Z` tag in the repo, `v` stripped. Non-semver tags (`vscode-0.6.1`) are not releases. */
+async function versionTags(root: string): Promise<string[]> {
+  const tags = (await runCommand("git", ["tag", "--list", "v*"], root).catch(() => ""))
+    .split("\n")
+    .map((line) => line.trim().replace(/^v/, ""))
+    .filter((v) => /^\d+\.\d+\.\d+$/.test(v));
+  return [...new Set(tags)];
+}
+
+/**
  * The package whose registry version stands for the release. Derived from the files that already
  * carry the lockstep version rather than hardcoded, so this works outside this repo: the first
  * non-private one with a name wins, and a single-package repo resolves to its root package.json.
@@ -890,11 +963,7 @@ async function primaryPublishablePackage(root: string): Promise<string | null> {
 
 /** Version tags strictly between what npm has and what HEAD carries — the ones that were skipped. */
 async function taggedVersionsBetween(root: string, after: string, before: string): Promise<string[]> {
-  const tags = (await runCommand("git", ["tag", "--list", "v*"], root).catch(() => ""))
-    .split("\n")
-    .map((line) => line.trim().replace(/^v/, ""))
-    .filter((v) => /^\d+\.\d+\.\d+$/.test(v));
-  return [...new Set(tags)]
+  return (await versionTags(root))
     .filter((v) => compareSemver(v, after) > 0 && compareSemver(v, before) < 0)
     .sort(compareSemver);
 }
@@ -2571,16 +2640,8 @@ async function readPackageVersionAtRef(root: string, ref: string, relPath: strin
   }
 }
 
-function compareSemver(a: string, b: string): number {
-  const pa = a.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
-  const pb = b.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
-  const len = Math.max(pa.length, pb.length, 3);
-  for (let i = 0; i < len; i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
+/** Ordering lives in core so the npm and Release checks cannot disagree about which tag is newer. */
+const compareSemver = compareVersions;
 
 async function tagPointsAtHead(root: string, tag: string): Promise<boolean> {
   const tags = await runCommand("git", ["tag", "--points-at", "HEAD"], root).catch(() => "");

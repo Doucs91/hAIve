@@ -174,7 +174,7 @@ hivelore enforce status                  # show whether the repo is protected
 hivelore enforce check --stage local     # local policy gate
 hivelore enforce check --stage pre-push  # used by Git hooks
 hivelore enforce ci                      # used by required CI checks
-hivelore enforce finish                  # final agent-exit gate: commit/push + version/tag protocol
+hivelore enforce finish                  # final agent-exit gate: commit/push, version/tag, CI, npm + GitHub Release
 hivelore enforce cleanup                 # remove generated .ai runtime/cache artifacts
 ```
 

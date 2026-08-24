@@ -6,6 +6,48 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.4] — A tag is not a release
+
+`enforce finish` learned to check the npm registry in 0.57.3. It still could not see the other end
+of the chain: this repo carried **190 version tags and zero GitHub Releases** for four months, and
+the only thing that ever noticed was a third-party listing scoring the project down for it.
+
+They are not the same signal. npm is where the code is *installed from*; a GitHub Release is where a
+version is *announced* — changelog, provenance, and the artifact that directories, score checkers
+and humans read to decide whether a project ships.
+
+### The pre-adoption rule is the whole design
+
+The naive check — "every tag should have a Release" — would have produced 189 warnings that no
+action could ever clear, and a warning you cannot clear is one people learn to scroll past. So only
+tags **newer than the oldest existing Release** count as gaps. Adopting the practice at v0.57
+retroactively cleans nothing, and is not asked to.
+
+Verified against this repo's real 187 semver tags, in all three states:
+
+```
+187 tags, no Release   → ℹ github-releases-absent    (one line, points at the current version)
+187 tags, v0.57.3 out  → ✓ github-release-published  (the 186 older tags stay silent)
+v0.58.0 tagged, unreleased → ℹ github-release-pending
+v0.58.0 + v0.58.1 skipped  → ⚠ github-releases-skipped
+```
+
+Severities mirror the npm check exactly and for the same reason: `finish` runs BEFORE the Release is
+cut, so "HEAD has no Release yet" can only be info. Never an error — releasing is the human's call.
+Drafts do not count as published; a long gap is capped at five listed versions plus a count. Off
+with `enforcement.githubReleaseCheck: "off"`.
+
+The verdict logic is pure, in `core/github-release.ts`; `gh release list --json` and `git tag` stay
+in the CLI, so all seven cases are unit-tested without a network call.
+
+### Also: one ordering, not three
+
+Three byte-identical copies of the version comparator existed — two in `core`, one in `enforce.ts` —
+because each new release check wrote its own instead of looking for one. Extracted to
+`core/version-order.ts`. Two gates reading the same tags must not be able to disagree about which
+one is newer.
+
+
 ## [0.57.3] — `enforce finish` checks the last link of the release chain
 
 The gate verified commit, version, tag, push and CI — everything except whether the release actually
