@@ -36,6 +36,7 @@ interface AddOptions {
   body?: string;
   bodyFile?: string;
   topic?: string;
+  lifecycle?: string;
   activationKeyword?: string;
   activationGlob?: string;
   activationAlways?: boolean;
@@ -86,6 +87,7 @@ export function registerMemoryAdd(memory: Command): void {
     .option("--body-file <path>", "read memory body from a Markdown file — for long content")
     .option("--no-auto-tag", "disable automatic tag suggestions inferred from anchor paths")
     .option("--topic <key>", "stable key for upsert: if a memory with this topic+scope already exists, update it in-place (revision_count++)")
+    .option("--lifecycle <state>", "applied (default) | planned (decided, not yet implemented) | abandoned — surfaced distinctly in briefings")
     .option("--activation-keyword <csv>", "skill only: comma-separated keywords that trigger progressive disclosure of this skill")
     .option("--activation-glob <csv>", "skill only: comma-separated path globs that trigger this skill")
     .option("--activation-always", "skill only: always surface this skill (no triggers needed)")
@@ -100,6 +102,12 @@ export function registerMemoryAdd(memory: Command): void {
         return;
       }
       const config = await loadConfig(paths);
+
+      if (opts.lifecycle && !["applied", "planned", "abandoned"].includes(opts.lifecycle)) {
+        ui.error(`Invalid --lifecycle "${opts.lifecycle}" — expected one of: applied | planned | abandoned.`);
+        process.exitCode = 1;
+        return;
+      }
 
       const userTags = parseCsv(opts.tags);
       const anchorPaths = parseCsv(opts.paths ?? opts.files);
@@ -179,6 +187,7 @@ export function registerMemoryAdd(memory: Command): void {
             ...fm,
             revision_count: revisionCount,
             ...(activation ? { activation } : {}),
+            ...(opts.lifecycle ? { lifecycle: opts.lifecycle as MemoryFrontmatter["lifecycle"] } : {}),
             tags: mergedTags.length ? mergedTags : fm.tags,
             anchor: {
               commit: opts.commit ?? fm.anchor.commit,
@@ -209,6 +218,7 @@ export function registerMemoryAdd(memory: Command): void {
         topic: opts.topic,
         status: config.defaultStatus === "validated" ? "validated" : undefined,
         activation,
+        lifecycle: opts.lifecycle as MemoryFrontmatter["lifecycle"] | undefined,
       });
       // Created already-validated by config (defaultStatus), not by explicit review → mark "auto".
       if (frontmatter.status === "validated") frontmatter.validated_by = "auto";

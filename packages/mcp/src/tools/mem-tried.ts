@@ -158,6 +158,7 @@ export async function memTried(
         bad_example: input.sensor.bad_example,
         flags: undefined,
         paths: [],
+        replace: false,
       },
       ctx,
     );

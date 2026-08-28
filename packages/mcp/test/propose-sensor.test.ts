@@ -134,6 +134,63 @@ describe("proposeSensor — agent proposes, core validates", () => {
     expect(out.self_check.silent_on_current).toBe(true);
   });
 
+  it("refuses to silently overwrite a validated sensor, unless replace=true", async () => {
+    const first = await proposeSensor(
+      {
+        memory_id: memoryId,
+        pattern: "stripe\\.paymentIntents\\.create",
+        absent: "idempotencyKey",
+        bad_example: "stripe.paymentIntents.create({ amount: 1 });",
+        severity: "block",
+        message: undefined,
+        flags: undefined,
+        paths: [],
+      },
+      ctx,
+    );
+    expect(first.accepted).toBe(true);
+    const firstSensor = await loadSensor();
+    expect(firstSensor?.autogen).toBe(false);
+
+    // A second, different proposal must NOT silently replace the first (the field-report bug:
+    // both answered accepted:true, the second overwrote the first, protection was lost).
+    const second = await proposeSensor(
+      {
+        memory_id: memoryId,
+        pattern: "process\\.env\\.SECRET",
+        absent: undefined,
+        bad_example: "const s = process.env.SECRET;",
+        severity: "block",
+        message: undefined,
+        flags: undefined,
+        paths: [],
+      },
+      ctx,
+    );
+    expect(second.accepted).toBe(false);
+    expect(second.reason).toBe("sensor-exists");
+    // The first sensor is untouched on disk.
+    expect(await loadSensor()).toEqual(firstSensor);
+
+    // With replace=true the caller opts in to overwrite deliberately.
+    const replaced = await proposeSensor(
+      {
+        memory_id: memoryId,
+        pattern: "stripe\\.paymentIntents\\.create",
+        absent: "idempotencyKey",
+        bad_example: "stripe.paymentIntents.create({ amount: 1 });",
+        severity: "block",
+        message: "Replaced deliberately.",
+        flags: undefined,
+        paths: [],
+        replace: true,
+      },
+      ctx,
+    );
+    expect(replaced.accepted).toBe(true);
+    expect((await loadSensor())?.message).toBe("Replaced deliberately.");
+  });
+
   it("command sensor: a passing oracle can be persisted at warn without RED proof", async () => {
     const out = await proposeSensor(
       {

@@ -658,7 +658,12 @@ export function registerSync(program: Command): void {
           // "not available or index build failed" told a user whose package WAS installed to install
           // it — the real cause was a native dep that could not load under their Node version, and
           // the message hid it. Say which of the two it is, and always print the underlying error.
-          const detail = (error instanceof Error ? error.message : String(error)).split("\n")[0]!.trim();
+          const rawDetail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+          // Never emit an empty detail after the colon (field report §4.2 saw exactly that): fall back
+          // to the first non-empty line, then the error name, so the message always carries a cause.
+          const detail =
+            rawDetail.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ??
+            (error instanceof Error ? error.name : "unknown error");
           const absent = detail.includes("@hivelore/embeddings") &&
             /ERR_MODULE_NOT_FOUND|Cannot find (module|package)/.test(detail);
           ui.warn(

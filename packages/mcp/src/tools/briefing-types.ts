@@ -17,6 +17,8 @@ export interface BriefingMemory {
   confidence: ConfidenceLevel;
   /** Present when confidence is 'low' or 'unverified' — AI should weight this memory cautiously. */
   unverified?: true;
+  /** 'planned' = decided but not yet implemented; 'abandoned' = rejected. Absent/`applied` = describes current code. */
+  lifecycle?: "applied" | "planned" | "abandoned";
   read_count: number;
   /** Demonstrated-utility score in [0,1] from the closed-loop impact layer (reads + applied + sensor fires vs rejections/stale/dormancy). */
   impact_score?: number;

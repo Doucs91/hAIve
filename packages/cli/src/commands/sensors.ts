@@ -89,6 +89,7 @@ interface SensorsProposeOptions {
   fromFix?: string;
   flags?: string;
   paths?: string;
+  replace?: boolean;
   json?: boolean;
   dir?: string;
 }
@@ -504,6 +505,7 @@ export function registerSensors(program: Command): void {
     .option("--red-ref <ref>", "kind=shell|test: pre-fix commit/ref — validation replays it in a scratch worktree and requires the oracle to FAIL there (records red_proven)")
     .option("--flags <flags>", "regex flags (e.g. i)")
     .option("--paths <csv>", "override scope paths (defaults to the memory anchors)")
+    .option("--replace", "deliberately replace a DIFFERENT sensor already on this memory (otherwise refused, to avoid silent loss)", false)
     .option("--json", "emit a machine-readable proposal verdict", false)
     .option("-d, --dir <dir>", "project root")
     .action(async (id: string, opts: SensorsProposeOptions) => {
@@ -548,6 +550,7 @@ export function registerSensors(program: Command): void {
             red_ref: opts.redRef,
             flags: undefined,
             paths: opts.paths ? opts.paths.split(",").map((p) => p.trim()).filter(Boolean) : [],
+            replace: Boolean(opts.replace),
           },
           { paths: resolveHaivePaths(root) },
         );
@@ -644,6 +647,20 @@ export function registerSensors(program: Command): void {
         ui.error(`Rejected (${verdict.reason}).`);
         ui.warn(explainSensorRejection(verdict, { style: "cli", memoryId: id }));
         process.exitCode = 1;
+        return;
+      }
+
+      // Same silent-overwrite guard as the MCP handler: a DIFFERENT hand-authored sensor already
+      // on this memory would be destroyed by this write. Refuse unless --replace is passed.
+      const existing = found.memory.frontmatter.sensor;
+      const sameGuardrail = !!existing && existing.kind === "regex" && (existing.pattern ?? "") === opts.pattern;
+      if (existing && existing.autogen === false && !sameGuardrail && !opts.replace) {
+        rejectProposal(
+          opts,
+          "sensor-exists",
+          `This memory already carries a validated ${existing.severity} regex sensor (pattern=${existing.pattern ?? "?"}). ` +
+          `Pass --replace to overwrite it deliberately, or attach this second symptom to a separate memory.`,
+        );
         return;
       }
 

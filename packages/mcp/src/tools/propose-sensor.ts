@@ -109,6 +109,15 @@ export const ProposeSensorInputSchema = {
     .array(z.string())
     .default([])
     .describe("Override scope paths. Defaults to the memory's anchor paths."),
+  replace: z
+    .boolean()
+    .default(false)
+    .describe(
+      "Set true to DELIBERATELY replace a sensor already hand-authored on this memory. Without it, a " +
+      "second proposal onto a memory that already carries a validated sensor is REFUSED — otherwise the " +
+      "second call silently destroys the first while still answering accepted:true. One memory holds one " +
+      "sensor; use a separate memory for a second, distinct symptom.",
+    ),
 };
 
 export type ProposeSensorInput = {
@@ -327,6 +336,40 @@ export async function proposeSensor(
   const found = loaded.find(({ memory }) => memory.frontmatter.id === input.memory_id);
   if (!found) {
     throw new Error(`No memory found with id ${input.memory_id}`);
+  }
+
+  // Guard against SILENT sensor loss: a second proposal carrying a DIFFERENT guardrail onto a
+  // memory that already holds a hand-authored (non-autogen) sensor used to overwrite the first
+  // while answering accepted:true — a team believed a rule enforced when its guardrail no longer
+  // existed. Refuse that unless the caller opts in with replace=true. Two flows stay allowed:
+  //   • upgrading/refining the SAME sensor (same pattern/command) — e.g. warn → block, tune `absent`;
+  //   • replacing an autogen (warn) suggestion — that IS the mem_tried → propose_sensor loop.
+  const existingSensor = found.memory.frontmatter.sensor;
+  const sameGuardrail =
+    !!existingSensor &&
+    existingSensor.kind === kind &&
+    (input.pattern ?? "") === (existingSensor.pattern ?? "") &&
+    (input.command ?? "") === (existingSensor.command ?? "") &&
+    JSON.stringify(input.rule ?? null) === JSON.stringify(existingSensor.rule ?? null);
+  if (existingSensor && existingSensor.autogen === false && !sameGuardrail && !input.replace) {
+    const shape =
+      existingSensor.kind === "regex"
+        ? `pattern=${existingSensor.pattern ?? "?"}`
+        : existingSensor.kind === "ast"
+          ? "an ast rule"
+          : `command=${existingSensor.command ?? "?"}`;
+    return {
+      accepted: false,
+      memory_id: input.memory_id,
+      severity: input.severity,
+      reason: "sensor-exists",
+      guidance:
+        `This memory already carries a validated ${existingSensor.severity} sensor (kind=${existingSensor.kind}, ${shape}). ` +
+        `Proposing a DIFFERENT one would REPLACE it — pass replace=true to overwrite it deliberately, or capture this ` +
+        `second symptom as a separate memory so both guardrails survive. One memory holds one sensor.`,
+      self_check: { silent_on_current: false, fires_on_bad: null, fired_on: [] },
+      file_path: found.filePath,
+    };
   }
 
   // A sensor on a personal (gitignored) memory only guards THIS machine — the lesson would still

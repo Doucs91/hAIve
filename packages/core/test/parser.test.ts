@@ -93,6 +93,26 @@ body`;
     expect(() => parseMemory(input)).toThrow();
   });
 
+  it("names the field and allowed values on an unsupported type (no cryptic '([)')", () => {
+    const input = `---
+id: 2026-08-27-reference-x
+type: reference
+created_at: 2026-08-27T10:00:00.000Z
+---
+body`;
+    // A hand-written 'reference' file used to vanish with a meaningless '([)' error. The message
+    // must now name the field, the offending value, and the supported types so the loss is fixable.
+    expect(() => parseMemory(input)).toThrow(/invalid type/i);
+    expect(() => parseMemory(input)).toThrow(/reference/);
+    expect(() => parseMemory(input)).toThrow(/convention|gotcha|decision/);
+    try {
+      parseMemory(input);
+    } catch (err) {
+      expect((err as Error).message).not.toContain("([");
+      expect((err as Error).message.split("\n")).toHaveLength(1);
+    }
+  });
+
   it("applies sensible defaults", () => {
     const input = `---
 id: 2026-04-25-glossary-term

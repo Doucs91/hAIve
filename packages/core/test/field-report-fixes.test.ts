@@ -12,6 +12,9 @@ import {
   serializeCodeMap,
   shouldExpandGateReminder,
   resolveHaivePaths,
+  buildFrontmatter,
+  parseMemory,
+  serializeMemory,
   type CodeMap,
   type HaivePaths,
   type PreventionReceipt,
@@ -186,5 +189,24 @@ describe("prevention comment (§3.1: built by the CLI, not by jq inside YAML)", 
     expect(body).toContain("const d = moment();");
     // Process findings are not preventions and must not pad the receipt.
     expect(body).not.toContain("no briefing");
+  });
+});
+
+describe("lifecycle: applied | planned | abandoned (§3.3: nothing distinguished 'decided' from 'implemented')", () => {
+  it("round-trips through buildFrontmatter → serialize → parse", () => {
+    const fm = buildFrontmatter({ type: "decision", slug: "httponly-cookie", scope: "team", lifecycle: "planned" });
+    expect(fm.lifecycle).toBe("planned");
+    const round = parseMemory(serializeMemory({ frontmatter: fm, body: "# Decision\n\nMove refresh token to an httpOnly cookie." }));
+    expect(round.frontmatter.lifecycle).toBe("planned");
+  });
+
+  it("defaults to undefined (treated as 'applied') and rejects an unknown value with a clear message", () => {
+    const fm = buildFrontmatter({ type: "decision", slug: "x", scope: "team" });
+    expect(fm.lifecycle).toBeUndefined();
+    expect(() =>
+      parseMemory(
+        "---\nid: 2026-08-27-decision-y\ntype: decision\ncreated_at: 2026-08-27T10:00:00.000Z\nlifecycle: someday\n---\nbody",
+      ),
+    ).toThrow(/invalid lifecycle/i);
   });
 });

@@ -1,4 +1,5 @@
 import matter from "gray-matter";
+import { z } from "zod";
 import { MemoryFrontmatterSchema } from "./schema.js";
 import type { Activation, Memory, MemoryFrontmatter, Sensor } from "./types.js";
 
@@ -8,11 +9,33 @@ export function stripPrivate(body: string): string {
   return body.replace(PRIVATE_BLOCK_RE, "").trimEnd();
 }
 
+/**
+ * Turn a ZodError on the frontmatter into ONE actionable sentence naming the field, the offending
+ * value, and — for an enum — the allowed values. A raw ZodError serializes as a multi-line JSON
+ * array, so `err.message.split("\n")[0]` (how the loader records the failure) collapsed to a bare
+ * `[`, which surfaced in `hivelore doctor` as the meaningless `([)`. A lost corpus file must say
+ * WHY it is invisible, or the lesson is lost without a fixable signal.
+ */
+function formatFrontmatterError(err: z.ZodError): string {
+  const issue = err.issues[0];
+  if (!issue) return "invalid frontmatter";
+  const field = issue.path.length > 0 ? issue.path.join(".") : "frontmatter";
+  if (issue.code === "invalid_enum_value") {
+    const got = JSON.stringify((issue as z.ZodInvalidEnumValueIssue).received);
+    const allowed = (issue as z.ZodInvalidEnumValueIssue).options.join(" | ");
+    return `invalid ${field}: ${got} is not a supported value — expected one of: ${allowed}`;
+  }
+  return `invalid ${field}: ${issue.message}`;
+}
+
 export function parseMemory(raw: string): Memory {
   const parsed = matter(raw);
-  const frontmatter = MemoryFrontmatterSchema.parse(parsed.data);
+  const result = MemoryFrontmatterSchema.safeParse(parsed.data);
+  if (!result.success) {
+    throw new Error(formatFrontmatterError(result.error));
+  }
   return {
-    frontmatter,
+    frontmatter: result.data,
     body: stripPrivate(parsed.content.trim()),
   };
 }
@@ -63,6 +86,7 @@ export function buildFrontmatter(input: {
   relatedIds?: string[];
   sensor?: Sensor;
   activation?: Activation;
+  lifecycle?: MemoryFrontmatter["lifecycle"];
 }): MemoryFrontmatter {
   const now = new Date();
   const id = newMemoryId(input.type, input.slug, now);
@@ -85,6 +109,7 @@ export function buildFrontmatter(input: {
     topic: input.topic,
     sensor: input.sensor,
     activation: input.activation,
+    lifecycle: input.lifecycle,
     revision_count: 0,
     related_ids: input.relatedIds ?? [],
   });

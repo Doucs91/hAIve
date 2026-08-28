@@ -1158,6 +1158,37 @@ describe("Hivelore CLI integration", () => {
     }
   });
 
+  it("blocks the gate when a corpus file is unreadable (invalid type is a silently lost lesson)", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "haive-invalid-corpus-"));
+    try {
+      await exec("git", ["init"], { cwd: repo });
+      await exec("git", ["config", "user.email", "test@example.com"], { cwd: repo });
+      await exec("git", ["config", "user.name", "Hivelore Test"], { cwd: repo });
+      await run(repo, ["init", "--dir", repo, "--no-mcp-setup", "--stack", "none"]);
+
+      // A hand-written memory with an UNSUPPORTED type — parses nowhere, invisible to briefings.
+      // The gate used to say "passed" over it; it must now refuse (deterministic corpus defect).
+      await writeFile(
+        path.join(repo, ".ai/memories/team/2026-08-27-reference-mcp-tooling.md"),
+        "---\nid: 2026-08-27-reference-mcp-tooling\nscope: team\ntype: reference\ncreated_at: 2026-08-27T10:00:00.000Z\n---\n\nWhere the dashboard lives.\n",
+        "utf8",
+      );
+
+      const res = await runAllowFailure(repo, ["enforce", "check", "--stage", "pre-commit", "--json", "--dir", repo]);
+      const report = JSON.parse(res.stdout) as {
+        should_block: boolean;
+        findings: Array<{ code: string; severity: string; message: string }>;
+      };
+      const invalid = report.findings.find((f) => f.code === "invalid-memory-files");
+      expect(invalid).toBeDefined();
+      expect(invalid!.severity).toBe("error");
+      expect(invalid!.message).toContain("reference");
+      expect(report.should_block).toBe(true);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
   it("commit-msg hook blocks a skip-ci directive on a commit that changes shippable code (E prevention)", async () => {
     const repo = await mkdtemp(path.join(tmpdir(), "haive-commit-msg-"));
     try {
@@ -2264,6 +2295,58 @@ describe("Hivelore CLI integration", () => {
     } finally {
       await rm(repo, { recursive: true, force: true });
       await rm(remote, { recursive: true, force: true });
+    }
+  });
+
+  it("finish gate ignores a Hivelore-regenerated code-map.json left uncommitted (§4.4)", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "haive-finish-codemap-"));
+    try {
+      await exec("git", ["init", "-b", "main"], { cwd: repo });
+      await exec("git", ["config", "user.email", "test@example.com"], { cwd: repo });
+      await exec("git", ["config", "user.name", "Hivelore Test"], { cwd: repo });
+      await run(repo, ["init", "--manual", "--no-mcp-setup", "--stack", "none", "--no-bootstrap", "--dir", repo]);
+      await exec("git", ["add", "."], { cwd: repo });
+      await exec("git", ["commit", "-m", "initial"], { cwd: repo });
+
+      // Simulate what `sync` does: regenerate the tracked code-map, leaving it dirty. The tool must
+      // not block `finish` on its OWN artifact.
+      await writeFile(path.join(repo, ".ai/code-map.json"), '{"version":1,"files":{"src/x.ts":{"exports":[],"loc":1}}}\n', "utf8");
+
+      const result = await runAllowFailure(repo, ["enforce", "finish", "--json", "--dir", repo]);
+      const report = JSON.parse(result.stdout) as {
+        findings: Array<{ code: string; severity: string }>;
+      };
+      const codes = report.findings.map((f) => f.code);
+      expect(codes).not.toContain("git-sync-uncommitted-changes");
+      expect(codes).toContain("hivelore-artifact-regenerated");
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("doctor detects and fixes a .mcp.json pointing at the removed `haive` binary (§2)", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "haive-doctor-mcp-"));
+    try {
+      await exec("git", ["init", "-b", "main"], { cwd: repo });
+      await exec("git", ["config", "user.email", "test@example.com"], { cwd: repo });
+      await exec("git", ["config", "user.name", "Hivelore Test"], { cwd: repo });
+      await run(repo, ["init", "--manual", "--no-mcp-setup", "--stack", "none", "--no-bootstrap", "--dir", repo]);
+
+      // The exact dead config a field session ran with all session: the pre-rename binary name.
+      const mcpPath = path.join(repo, ".mcp.json");
+      await writeFile(mcpPath, JSON.stringify({ mcpServers: { haive: { command: "haive", args: ["mcp", "--stdio"] } } }, null, 2), "utf8");
+
+      const before = JSON.parse((await run(repo, ["doctor", "--json", "--dir", repo])).stdout) as {
+        findings: Array<{ code: string }>;
+      };
+      expect(before.findings.some((f) => f.code === "legacy-mcp-config")).toBe(true);
+
+      await run(repo, ["doctor", "--fix", "--dir", repo]);
+      const migrated = await readFile(mcpPath, "utf8");
+      expect(migrated).toContain('"command": "hivelore"');
+      expect(migrated).not.toMatch(/"command":\s*"haive"(?!-)/);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
     }
   });
 

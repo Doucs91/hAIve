@@ -163,6 +163,16 @@ export const MemoryFrontmatterSchema = z
      * Lets a human distinguish reviewed knowledge from AI/auto-trusted knowledge.
      */
     validated_by: z.enum(["human", "agent", "auto"]).nullable().default(null),
+    /**
+     * Does this memory describe code that EXISTS today, or a decision not yet built? Orthogonal to
+     * `confidence`/`status`: a `planned` decision can be fully trusted AS a decision while being false
+     * AS a description of the current code. Surfaced distinctly in briefings so an agent does not write
+     * code against a cookie/route/Node version that was only decided, never implemented (field report §3.3).
+     *   applied   — reflected in the code now (the default when omitted)
+     *   planned   — decided/intended, NOT yet implemented
+     *   abandoned — considered and rejected; kept so it is not re-attempted
+     */
+    lifecycle: z.enum(["applied", "planned", "abandoned"]).optional(),
   })
   .refine(
     (data) => data.scope !== "module" || !!data.module,

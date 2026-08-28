@@ -306,6 +306,7 @@ export async function getBriefing(
         status: fm.status,
         confidence: deriveConfidence(fm, u),
         ...(fm.status === "draft" || fm.status === "proposed" ? { unverified: true as const } : {}),
+        ...(fm.lifecycle && fm.lifecycle !== "applied" ? { lifecycle: fm.lifecycle } : {}),
         read_count: u.read_count,
         impact_score: imp.score,
         impact_tier: imp.tier,
@@ -576,7 +577,15 @@ export async function getBriefing(
   const memoriesText = memories
     .map((m) => {
       const unverified = m.status === "proposed" ? " [UNVERIFIED — not yet validated]" : "";
-      return `### ${m.id} (${m.scope}/${m.type}, ${m.confidence})${unverified}\n${m.body.trim()}`;
+      // A planned/abandoned lesson is TRUE as a decision but FALSE as a description of today's code —
+      // flag it so the agent does not write code against a route/field/version only ever decided.
+      const lifecycle =
+        m.lifecycle === "planned"
+          ? " [PLANNED — decided, NOT yet implemented; do not assume it exists in the code]"
+          : m.lifecycle === "abandoned"
+            ? " [ABANDONED — considered and rejected; do not re-introduce]"
+            : "";
+      return `### ${m.id} (${m.scope}/${m.type}, ${m.confidence})${unverified}${lifecycle}\n${m.body.trim()}`;
     })
     .join("\n\n---\n\n");
 

@@ -6,7 +6,63 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.5] — Guard the write path, not just the sensors
+
+Two independent field sessions on real repositories reached the same conclusion: Hivelore's rigor
+stops at the sensors, and the path that *creates* corpus value — writing a memory, arming a guard —
+is the least protected. This release closes those loops. Every change is deterministic and covered by
+a regression test named for the symptom it prevents.
+
+### No silent corpus loss
+
+- **An unreadable corpus file now fails the gate.** A hand-written memory with an unsupported `type`
+  (e.g. `reference`) parsed nowhere, was invisible to every briefing, yet the gate said "passed" over
+  it — a lost team lesson nobody learned about unless they happened to run `doctor`. The gate now
+  emits a blocking `invalid-memory-files` finding, closing the gap between what `doctor` saw and what
+  the gate enforced.
+- **Invalid frontmatter says why.** `parseMemory` used to surface a truncated ZodError that reached
+  `doctor` as the meaningless `([)`. It now names the field, the offending value, and the allowed set
+  (`invalid type: "reference" … expected one of: convention | decision | gotcha | …`).
+
+### A guardrail is never silently replaced
+
+- **A second `propose_sensor` no longer overwrites the first.** Proposing a *different* guardrail onto
+  a memory that already carries a hand-authored sensor is refused (`sensor-exists`) unless the caller
+  passes `replace: true` / `--replace`. Refining the same sensor (warn→block, tuning `absent`) and
+  upgrading an autogen suggestion stay allowed — those are the intended loop. Previously both calls
+  answered `accepted: true` and the second silently destroyed the first.
+
+### Decided is not implemented
+
+- **New `lifecycle: applied | planned | abandoned`**, orthogonal to `confidence`/`status`. A `planned`
+  decision can be fully trusted *as a decision* while being false *as a description of today's code*.
+  Set it via `mem_save` (MCP) or `hivelore memory save --lifecycle`; `planned`/`abandoned` memories are
+  surfaced distinctly in the briefing (`[PLANNED — decided, NOT yet implemented]`) so an agent does not
+  write code against a route/field/version that was only ever decided.
+
+### Sharper feedback, less noise
+
+- **The brittle-sensor heuristic no longer rejects IP/port literals or regex escapes.** A pattern like
+  `https?://127\.0\.0\.1:\d+` was wrongly flagged as a "hardcoded line number"; `\d \w \s` escapes and
+  dotted-quad IPs/versions are now exempt, and the message names the offending token.
+- **"Invalid anchor" is no longer mislabeled "stale".** When a memory anchors to a file that does not
+  exist in this repo, the gate says so, suggests the likely rename, and points at the command that
+  actually repairs it (`memory update --paths`) instead of `verify --update`, which only relabels.
+- **The false "one-time" semantic-index message is gone** when the embedder cannot load — it was
+  printed on every commit because the build never succeeded. The `--embed` failure now always carries a
+  non-empty cause instead of an empty `index build failed:`.
+- **`enforce finish` no longer blocks on its own regenerated `.ai/code-map.json`** — a deterministic,
+  Hivelore-owned artifact is not the agent's uncommitted work.
+
+### MCP config drift after the rename
+
+- **`doctor` detects a dead `.mcp.json`.** The `haive → hivelore` rename left configs pointing at a
+  `haive` binary that no longer exists (a field session ran with a silently dead MCP the entire time).
+  `doctor` now flags `"command": "haive"` (not only `haive-mcp`), scans a few parent directories (the
+  monorepo-root config Claude Code actually loads), and `--fix` migrates it to `hivelore`.
+
 ## [0.57.4] — A tag is not a release
+
 
 `enforce finish` learned to check the npm registry in 0.57.3. It still could not see the other end
 of the chain: this repo carried **190 version tags and zero GitHub Releases** for four months, and

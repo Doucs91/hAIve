@@ -241,13 +241,16 @@ async function refreshCodeSearchIndex(paths: HaivePaths): Promise<boolean> {
     // Cold start on a large repo embeds every source chunk (~40s/1600 files) — without a
     // heads-up the first briefing just looks hung. stderr keeps MCP stdout (JSON-RPC) clean.
     const cold = !existsSync(mod.codeIndexPath(paths));
+    // Load the embedder FIRST: if it can't (wrong Node ABI, missing native dep), the index build
+    // never succeeds, `cold` stays true forever, and announcing "one-time" on every invocation is a
+    // lie the field reports flagged. Only promise the one-time build once we know it can happen.
+    const embedder = await mod.Embedder.create();
     if (cold) {
       console.error(
         "[hivelore] Building the semantic code index (one-time — large repos can take a minute). " +
         "Subsequent briefings reuse the cache.",
       );
     }
-    const embedder = await mod.Embedder.create();
     const { report } = await mod.rebuildCodeIndex(paths, embedder);
     if (cold) console.error("[hivelore] Semantic code index ready.");
     return report.added > 0 || report.updated > 0 || report.removed > 0;

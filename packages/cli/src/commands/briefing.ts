@@ -472,6 +472,12 @@ export function registerBriefing(program: Command): void {
         const badge = ui.statusBadge(fm.status);
         const draftMarker = fm.status === "draft" ? ui.yellow(" [DRAFT]") : "";
         const unverifiedMarker = fm.status === "proposed" ? ui.yellow(" [UNVERIFIED]") : "";
+        const lifecycleMarker =
+          fm.lifecycle === "planned"
+            ? ui.yellow(" [PLANNED — not yet implemented]")
+            : fm.lifecycle === "abandoned"
+              ? ui.yellow(" [ABANDONED]")
+              : "";
         const originMarker = (item as LoadedWithOrigin).origin
           ? ` ${ui.yellow("[from " + (item as LoadedWithOrigin).origin + "]")}`
           : "";
@@ -479,7 +485,7 @@ export function registerBriefing(program: Command): void {
         const hitMarker = reads > 0 ? ` ${ui.dim("· " + reads + "× read")}` : "";
         const priority = priorities[idx] ?? "background";
         out(
-          `${ui.bold(fm.id)}  ${priorityBadge(priority)}  ${ui.dim(fm.scope + "/" + fm.type)}  ${badge}${draftMarker}${unverifiedMarker}${originMarker}${hitMarker}`,
+          `${ui.bold(fm.id)}  ${priorityBadge(priority)}  ${ui.dim(fm.scope + "/" + fm.type)}  ${badge}${draftMarker}${unverifiedMarker}${lifecycleMarker}${originMarker}${hitMarker}`,
         );
         if (opts.explainSource) {
           const relPath = path.relative(root, item.filePath);

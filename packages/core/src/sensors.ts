@@ -5,15 +5,29 @@ import { globToRegExp, isGlobPath } from "./relevance.js";
 /**
  * Is a regex sensor pattern brittle — over-fit to incident-specific literals that rot when code
  * shifts (hardcoded line numbers / ranges like `1131-1186`)? High-precision by design: digits that
- * live inside a character class (`[0-9]`) or quantifier (`{2,}`) generalize and are NOT flagged, so
- * durable patterns like `v[0-9]+\.[0-9]+` or `:\s*any\b` stay clean. Returns a short reason or null.
+ * live inside a character class (`[0-9]`) or quantifier (`{2,}`), regex escapes (`\d`, `\w`, `\s`),
+ * or a dotted-quad IP / version literal (`127\.0\.0\.1`, `1\.2\.3`) all GENERALIZE and are NOT
+ * flagged — so durable patterns like `v[0-9]+\.[0-9]+`, `:\s*any\b`, or `https?://127\.0\.0\.1:\d+`
+ * stay clean. Returns a short reason naming the offending token, or null.
  *
  * Used to keep brittle legacy sensors from being counted as real protection or promoted to `block`.
  */
 export function sensorPatternBrittleness(pattern: string): string | null {
-  const literal = pattern.replace(/\[[^\]]*\]/g, "").replace(/\{[^}]*\}/g, "");
-  if (/\d{2,}\s*-\s*\d{2,}/.test(literal)) return "hardcoded line/number range — rots when code shifts";
-  if (/\d{3,}/.test(literal)) return "hardcoded numeric literal (likely a line number) — rots when code shifts";
+  const literal = pattern
+    // Regex escapes (\d \w \s \b …) are structural, not literal digits — their letter is not a value.
+    .replace(/\\[a-zA-Z]/g, " ")
+    // Character classes and quantifiers generalize.
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/\{[^}]*\}/g, " ")
+    // Dotted-quad IPs and version triples (127\.0\.0\.1, 1\.2\.3) are structural constants, not line numbers.
+    .replace(/\b\d{1,3}(?:\s*\\?\.\s*\d{1,3}){2,3}\b/g, " ");
+  const range = literal.match(/\d{2,}\s*-\s*\d{2,}/);
+  if (range) return `hardcoded line/number range "${range[0].replace(/\s+/g, "")}" — rots when code shifts`;
+  const numeric = literal.match(/\d{3,}/);
+  if (numeric) {
+    return `hardcoded numeric literal "${numeric[0]}" (likely a line number) — rots when code shifts; ` +
+      `if it is a real constant, put it in a character class ([0-9]) or anchor it to a stable token`;
+  }
   return null;
 }
 

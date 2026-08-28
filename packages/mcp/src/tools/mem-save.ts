@@ -56,6 +56,14 @@ export const MemSaveInputSchema = {
     .string()
     .optional()
     .describe("Anchor commit SHA (for staleness detection later)"),
+  lifecycle: z
+    .enum(["applied", "planned", "abandoned"])
+    .optional()
+    .describe(
+      "Does this describe code that EXISTS now, or a decision not yet built? 'applied' (default) = " +
+      "reflected in the code; 'planned' = decided but NOT yet implemented (surfaced distinctly so agents " +
+      "don't write code against it as if it were real); 'abandoned' = rejected, kept so it isn't re-tried.",
+    ),
   topic: z
     .string()
     .optional()
@@ -266,6 +274,7 @@ export async function memSave(
         ...fm,
         tags: input.tags.length ? input.tags : fm.tags,
         revision_count: (fm.revision_count ?? 0) + 1,
+        ...(input.lifecycle ? { lifecycle: input.lifecycle } : {}),
         anchor: {
           commit: input.commit ?? fm.anchor.commit,
           paths: input.paths.length ? input.paths : fm.anchor.paths,
@@ -320,6 +329,7 @@ export async function memSave(
     topic: input.topic,
     status: haiveConfig.defaultStatus === "validated" ? "validated" : undefined,
     activation: input.type === "skill" ? input.activation : undefined,
+    lifecycle: input.lifecycle,
   });
   // Created already-validated by config (defaultStatus), not by explicit review → mark "auto".
   if (frontmatter.status === "validated") frontmatter.validated_by = "auto";

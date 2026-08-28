@@ -33,6 +33,17 @@ describe("sensorPatternBrittleness", () => {
     expect(sensorPatternBrittleness("DEBUG\\s*=\\s*True")).toBeNull();
     expect(sensorPatternBrittleness("antiPatternGate\\s*[:=]\\s*['\"]off['\"]")).toBeNull();
   });
+
+  it("does NOT flag IP/port literals or regex escapes, and names the offending token when it does", () => {
+    // Field report §4.1: `\d+` is a regex escape (not a line number) and `127\.0\.0\.1` is an IP —
+    // neither should be read as a brittle numeric literal. This exact pattern was wrongly rejected.
+    expect(sensorPatternBrittleness("['\"`]https?://(localhost|127\\.0\\.0\\.1):\\d+")).toBeNull();
+    expect(sensorPatternBrittleness("127\\.0\\.0\\.1")).toBeNull();
+    expect(sensorPatternBrittleness("app\\.listen\\(\\d+")).toBeNull();
+    // When it does flag, the message must name the token so the author knows what to fix.
+    expect(sensorPatternBrittleness("foo:\\s*1131")).toContain("1131");
+    expect(sensorPatternBrittleness("enforce\\.ts\\s*:\\s*1131-1186")).toContain("1131-1186");
+  });
 });
 
 function sensor(overrides: Partial<Sensor> = {}): Sensor {

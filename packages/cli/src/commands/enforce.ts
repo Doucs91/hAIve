@@ -24,6 +24,7 @@ import {
   loadConfig,
   detectAgentContext,
   loadMemoriesFromDir,
+  loadMemoriesFromDirDetailed,
   classifyNpmPublication,
   classifyGithubRelease,
   compareVersions,
@@ -643,33 +644,50 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
   }
 
   const shippableDirty = status.dirtyFiles.filter(isShippablePath);
+  // Hivelore regenerates `.ai/code-map.json` on every sync and it is git-tracked, so a `finish` run
+  // that just refreshed it would block on its OWN artifact ("dirty worktree") — the tool creating
+  // its own blocker (field report §4.4). A deterministic, regenerable index is not the agent's
+  // uncommitted work, so it must not gate the exit. (project-context.md stays in — it is human content.)
+  const isHiveloreRegenerated = (f: string): boolean => f === ".ai/code-map.json";
+  const regeneratedOnly = status.dirtyFiles.filter(isHiveloreRegenerated);
+  const dirtyFiles = status.dirtyFiles.filter((f) => !isHiveloreRegenerated(f));
+  const untrackedFiles = status.untrackedFiles.filter((f) => !isHiveloreRegenerated(f));
   // Untracked files need a different sentence AND a different fix than modified ones: they are
   // resolved by committing them *or* by ignoring them. Calling them "modified" sends the developer
   // hunting for a change that does not exist — and a file left untracked-and-unignored keeps the
   // worktree dirty forever, blocking this gate on every later task.
-  const modifiedCount = status.dirtyFiles.length - status.untrackedFiles.length;
-  const untrackedOnly = status.dirtyFiles.length > 0 && modifiedCount === 0;
-  if (status.dirtyFiles.length > 0) {
+  const modifiedCount = dirtyFiles.length - untrackedFiles.length;
+  const untrackedOnly = dirtyFiles.length > 0 && modifiedCount === 0;
+  if (dirtyFiles.length > 0) {
     findings.push({
       severity: "error",
       code: shippableDirty.length > 0 ? "git-sync-uncommitted-shippable" : "git-sync-uncommitted-changes",
       message: shippableDirty.length > 0
         ? `${shippableDirty.length} shippable file(s) are not committed.`
         : untrackedOnly
-          ? `${status.untrackedFiles.length} file(s) are untracked — neither committed nor ignored.`
-          : status.untrackedFiles.length > 0
-            ? `${status.dirtyFiles.length} file(s) are uncommitted (${modifiedCount} modified, ${status.untrackedFiles.length} untracked).`
-            : `${status.dirtyFiles.length} file(s) are modified but not committed.`,
+          ? `${untrackedFiles.length} file(s) are untracked — neither committed nor ignored.`
+          : untrackedFiles.length > 0
+            ? `${dirtyFiles.length} file(s) are uncommitted (${modifiedCount} modified, ${untrackedFiles.length} untracked).`
+            : `${dirtyFiles.length} file(s) are modified but not committed.`,
       fix: shippableDirty.length > 0
         ? "Bump the lockstep package version if needed, then `git add`, `git commit`, `git tag vX.Y.Z`, `git push && git push origin vX.Y.Z` (not `--tags`)."
         : untrackedOnly
           ? "Commit them — or add them to .gitignore if they are meant to stay local. Untracking a file without ignoring it leaves the worktree permanently dirty."
           : "Commit and push these changes before reporting the task done.",
       reason: "The multi-agent git-sync decision requires agents to leave completed work committed and pushed, not as a local diff.",
-      affected_files: status.dirtyFiles.slice(0, 12),
+      affected_files: dirtyFiles.slice(0, 12),
       impact: 100,
     });
     return finishReport(root, initialized, mode, findings, config);
+  }
+
+  if (regeneratedOnly.length > 0) {
+    findings.push({
+      severity: "info",
+      code: "hivelore-artifact-regenerated",
+      message: `Ignoring ${regeneratedOnly.length} Hivelore-regenerated artifact(s) left uncommitted: ${regeneratedOnly.join(", ")}.`,
+      fix: "Optional: `git add .ai/code-map.json && git commit` to keep it in sync — it is deterministic and safe to commit.",
+    });
   }
 
   findings.push({
@@ -1315,6 +1333,11 @@ async function buildEnforcementReport(
 
   findings.push(...await inspectIntegrationVersions(root, __HAIVE_VERSION__));
 
+  // A corpus file the loader cannot parse is INVISIBLE to briefings and to the gate itself — a
+  // silently lost team lesson. `doctor` already reports it; the gate must too, or "gate passed"
+  // is a lie about the corpus the commit just touched. Deterministic and code-bound → it blocks.
+  findings.push(...await checkCorpusReadable(paths));
+
   if (config.enforcement?.requireBriefingFirst !== false && stage !== "ci") {
     const hasBriefing = await hasRecentBriefingMarker(paths, sessionId);
     findings.push(hasBriefing
@@ -1462,6 +1485,32 @@ async function hasRecentSessionRecap(paths: ReturnType<typeof resolveHaivePaths>
 }
 
 /**
+ * A memory file the loader cannot parse is dropped silently by `loadMemoriesFromDir`, so it is
+ * invisible to every briefing AND to the gate — the exact shape of a lost lesson a field report
+ * hit: a `type: reference` file written by hand, parsed nowhere, yet the gate said "passed". This
+ * closes the gap between `doctor` (which reported it) and the gate (which did not).
+ */
+async function checkCorpusReadable(
+  paths: ReturnType<typeof resolveHaivePaths>,
+): Promise<EnforcementFinding[]> {
+  if (!existsSync(paths.memoriesDir)) return [];
+  const { invalid } = await loadMemoriesFromDirDetailed(paths.memoriesDir);
+  if (invalid.length === 0) return [];
+  const listed = invalid
+    .slice(0, 8)
+    .map((f) => `${path.relative(paths.root, f.filePath)} (${f.error})`)
+    .join("; ");
+  return [{
+    severity: "error",
+    code: "invalid-memory-files",
+    message:
+      `${invalid.length} memory file(s) failed to parse and are INVISIBLE to briefings and the gate: ${listed}`,
+    fix: "Fix the frontmatter (see `hivelore doctor` for the full list). A corpus file the gate cannot read is a silently lost lesson.",
+    impact: 50,
+  }];
+}
+
+/**
  * Stale-anchor policy, scoped to the change under review.
  *
  * A stale memory anchored somewhere the author never touched is a CORPUS-MAINTENANCE problem, not a
@@ -1481,6 +1530,10 @@ async function verifyMemoryPolicy(
   const findings: EnforcementFinding[] = [];
   const staleImportant: string[] = [];
   const staleElsewhere: string[] = [];
+  // Why each touched memory is flagged, so the message can say "anchor points at a file that does
+  // not exist here" (an invalid anchor) rather than the misleading catch-all "stale", and can offer
+  // the rename the file most likely moved to (field report §4).
+  const invalidAnchors: Array<{ id: string; missing: string[]; renames: string[] }> = [];
   let verified = 0;
 
   for (const { memory } of all) {
@@ -1499,7 +1552,15 @@ async function verifyMemoryPolicy(
     }
     if (config.enforcement?.blockStaleDecisionChanges !== false && ["decision", "gotcha"].includes(fm.type)) {
       const result = await verifyAnchor(memory, { projectRoot: paths.root });
-      if (result.stale) (touched ? staleImportant : staleElsewhere).push(fm.id);
+      if (result.stale) {
+        (touched ? staleImportant : staleElsewhere).push(fm.id);
+        // A "no longer exist" reason means the anchor never resolved here — an invalid anchor, not a
+        // moved-symbol staleness. Capture it (touched only — that is what blocks) for a precise message.
+        if (touched && result.reason?.includes("no longer exist")) {
+          const missing = result.reason.replace(/^.*exist:\s*/, "").split(",").map((s) => s.trim()).filter(Boolean);
+          invalidAnchors.push({ id: fm.id, missing, renames: result.possibleRenames });
+        }
+      }
     }
   }
 
@@ -1510,13 +1571,26 @@ async function verifyMemoryPolicy(
   });
 
   if (staleImportant.length > 0) {
+    // Prefer the actionable command that actually fixes the reported problem. `memory verify --update`
+    // only re-labels status; it does NOT repair a wrong anchor path, so pointing at it wastes the
+    // developer's time (field report §4). `memory update --paths` is the command that resolves it.
+    const invalid = invalidAnchors[0];
+    const renameHint = invalid?.renames.length
+      ? ` The file may have moved to: ${invalid.renames.slice(0, 3).join(", ")}.`
+      : "";
+    const wording = invalidAnchors.length > 0
+      ? `anchored to file(s) that do not exist in this repo`
+      : `stale on files this change touches`;
     findings.push({
       severity: "error",
       code: "stale-important-memories",
       message:
-        `${staleImportant.length} important anchored memor${staleImportant.length === 1 ? "y is" : "ies are"} stale ` +
-        `on files this change touches: ${staleImportant.slice(0, 8).join(", ")}`,
-      fix: "Run `hivelore memory verify --update`, then update or delete stale decisions/gotchas before merging.",
+        `${staleImportant.length} important anchored memor${staleImportant.length === 1 ? "y is" : "ies are"} ${wording}: ` +
+        `${staleImportant.slice(0, 8).join(", ")}` +
+        (invalid ? ` (e.g. ${invalid.id} → ${invalid.missing.join(", ")}).${renameHint}` : ""),
+      fix: invalidAnchors.length > 0
+        ? `Repair the anchor: \`hivelore memory update <id> --paths <existing-file>\` (or \`hivelore memory reject <id>\` if the lesson is obsolete). \`memory verify --update\` only relabels status — it will not fix a wrong path.`
+        : "Run `hivelore memory verify --update`, then update or delete stale decisions/gotchas before merging.",
       impact: 40,
       affected_files: changedFiles.slice(0, 20),
       memory_ids: staleImportant,

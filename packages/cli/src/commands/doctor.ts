@@ -739,16 +739,32 @@ export function registerDoctor(program: Command): void {
           path.join(root, ".cursor", "mcp.json"),
           path.join(root, ".vscode", "mcp.json"),
         ];
+        // Claude Code loads the `.mcp.json` from the directory the agent was launched in, which in a
+        // monorepo is often a PARENT of this package. A field session ran with a dead MCP all session
+        // because the monorepo-root .mcp.json (a parent) still pointed at `haive`. Walk up a few
+        // levels so an ancestor's stale config is caught too.
+        let ancestor = path.dirname(root);
+        for (let i = 0; i < 5 && ancestor && ancestor !== path.dirname(ancestor); i++) {
+          configPaths.push(path.join(ancestor, ".mcp.json"));
+          ancestor = path.dirname(ancestor);
+        }
         const staleConfigs: string[] = [];
         for (const cfgPath of configPaths) {
           if (!existsSync(cfgPath)) continue;
           try {
             const raw = await readFile(cfgPath, "utf8");
-            if (raw.includes('"haive-mcp"') || raw.includes("'haive-mcp'")) {
+            // Catch BOTH the standalone-package command (`haive-mcp`) AND the pre-rename bundled
+            // binary (`command: "haive"`). A field session ran with a dead MCP the whole time because
+            // the monorepo-root .mcp.json still said `"command": "haive"` — a binary that no longer
+            // exists after the hivelore rename — and nothing flagged it.
+            const usesHaiveMcp = raw.includes('"haive-mcp"') || raw.includes("'haive-mcp'");
+            const usesHaiveBinary = /"command"\s*:\s*"haive"/.test(raw);
+            if (usesHaiveMcp || usesHaiveBinary) {
               staleConfigs.push(path.relative(root, cfgPath));
               if (opts.fix && !opts.dryRun) {
                 const updated = raw
                   .replace(/"command"\s*:\s*"haive-mcp"/g, '"command": "hivelore"')
+                  .replace(/"command"\s*:\s*"haive"/g, '"command": "hivelore"')
                   .replace(/"args"\s*:\s*\[\]/g, '"args": ["mcp", "--stdio"]');
                 await writeFile(cfgPath, updated, "utf8");
               }
@@ -760,9 +776,9 @@ export function registerDoctor(program: Command): void {
             severity: "warn",
             code: "legacy-mcp-config",
             message:
-              `${staleConfigs.length} MCP config file${staleConfigs.length === 1 ? "" : "s"} still reference the old "haive-mcp" command: ` +
+              `${staleConfigs.length} MCP config file${staleConfigs.length === 1 ? "" : "s"} still reference the removed "haive"/"haive-mcp" command: ` +
               staleConfigs.join(", ") +
-              `. Run \`hivelore doctor --fix\` to auto-migrate to the bundled server.`,
+              `. The binary was renamed to \`hivelore\`, so the MCP server fails to start (ENOENT: haive). Run \`hivelore doctor --fix\` to auto-migrate.`,
             fix: "hivelore doctor --fix",
             section: "Protection" as DoctorSection,
           });
