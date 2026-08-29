@@ -551,6 +551,7 @@ export function registerSensors(program: Command): void {
             flags: undefined,
             paths: opts.paths ? opts.paths.split(",").map((p) => p.trim()).filter(Boolean) : [],
             replace: Boolean(opts.replace),
+            require_present: false,
           },
           { paths: resolveHaivePaths(root) },
         );

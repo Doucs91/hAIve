@@ -62,6 +62,14 @@ export const SensorSchema = z.object({
   absent: z.string().optional(),
   /** Regex flags (e.g. "i", "m"). Ignored for non-regex kinds. */
   flags: z.string().optional(),
+  /**
+   * kind=regex only: flip the sensor into a REQUIRED-PRESENCE invariant. `pattern` then names a line
+   * that must REMAIN present in the anchored file's final content; the sensor FIRES when a change
+   * removes it. A normal regex sensor scans ADDED lines and so structurally cannot see a deletion —
+   * this catches the "someone deleted the critical line" class (e.g. a `TimeZone.setDefault(UTC)`
+   * guard) that a diff-of-additions sensor misses (field report §3.5).
+   */
+  require_present: z.boolean().optional(),
   /** Shell/test command to run (for kind=shell|test). Executed by the CLI, never by core. */
   command: z.string().optional(),
   /** Max runtime for kind=shell|test commands (default 120000). The executor kills on expiry. */

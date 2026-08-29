@@ -159,6 +159,7 @@ export async function memTried(
         flags: undefined,
         paths: [],
         replace: false,
+        require_present: false,
       },
       ctx,
     );

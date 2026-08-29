@@ -191,6 +191,43 @@ describe("proposeSensor — agent proposes, core validates", () => {
     expect((await loadSensor())?.message).toBe("Replaced deliberately.");
   });
 
+  it("require_present: accepts an invariant whose marker is present, rejects one whose marker is absent", async () => {
+    const present = await proposeSensor(
+      {
+        memory_id: memoryId,
+        pattern: "stripe\\.paymentIntents\\.create",
+        require_present: true,
+        severity: "block",
+        absent: undefined,
+        bad_example: undefined,
+        message: "Do not delete the payment call.",
+        flags: undefined,
+        paths: [],
+      },
+      ctx,
+    );
+    expect(present.accepted).toBe(true);
+    expect((await loadSensor())?.require_present).toBe(true);
+
+    const absent = await proposeSensor(
+      {
+        memory_id: memoryId,
+        pattern: "someLineThatIsNotInTheFile\\(",
+        require_present: true,
+        severity: "block",
+        replace: true,
+        absent: undefined,
+        bad_example: undefined,
+        message: undefined,
+        flags: undefined,
+        paths: [],
+      },
+      ctx,
+    );
+    expect(absent.accepted).toBe(false);
+    expect(absent.reason).toBe("presence-marker-absent");
+  });
+
   it("command sensor: a passing oracle can be persisted at warn without RED proof", async () => {
     const out = await proposeSensor(
       {

@@ -6,6 +6,8 @@ import {
   judgeProposedSensor,
   runRegexSensor,
   runSensors,
+  runPresenceSensors,
+  changedPathsFromDiff,
   selectCommandSensors,
   sensorAppliesToPath,
   sensorPatternBrittleness,
@@ -395,6 +397,59 @@ describe("judgeProposedSensor — inverted-sensor guard", () => {
       currentTargets: [], badExamples: ["import x from 'moment'"], correctExamples: ["date-fns"],
     });
     expect(verdict.accepted).toBe(true);
+  });
+
+  it("rejects an inverted WARN sensor too — noise on correct code is bad at any severity (§3.4)", () => {
+    const invertedWarn: Sensor = {
+      kind: "regex", pattern: "date-fns", paths: ["src/dates.ts"],
+      message: "x", severity: "warn", autogen: false, last_fired: null,
+    };
+    const verdict = judgeProposedSensor(invertedWarn, {
+      currentTargets: [], badExamples: [], correctExamples: ["date-fns"],
+    });
+    expect(verdict.accepted).toBe(false);
+    expect(verdict.reason).toBe("fires-on-correct");
+  });
+});
+
+describe("presence sensors (require_present) — fire on a DELETION (§3.5)", () => {
+  const clockGuard = sensor({
+    pattern: "TimeZone\\.setDefault\\(",
+    require_present: true,
+    paths: ["src/ClockConfig.java"],
+    severity: "block",
+    message: "Do not remove the UTC default — it prevents the TIME-column shift.",
+  });
+
+  it("changedPathsFromDiff parses touched files, including pure deletions", () => {
+    const diff = [
+      "diff --git a/src/ClockConfig.java b/src/ClockConfig.java",
+      "--- a/src/ClockConfig.java",
+      "+++ b/src/ClockConfig.java",
+      "@@ -3,4 +3,3 @@",
+      "   static {",
+      "-    TimeZone.setDefault(TimeZone.getTimeZone(\"UTC\"));",
+      "   }",
+    ].join("\n");
+    expect(changedPathsFromDiff(diff)).toContain("src/ClockConfig.java");
+  });
+
+  it("fires when the required line is ABSENT from the final content", () => {
+    const finalNoUtc = [{ path: "src/ClockConfig.java", content: "class ClockConfig { static { /* nothing */ } }" }];
+    const hits = runPresenceSensors([memory(clockGuard, ["src/ClockConfig.java"])], finalNoUtc);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.severity).toBe("block");
+  });
+
+  it("stays silent when the required line is still present", () => {
+    const finalWithUtc = [{ path: "src/ClockConfig.java", content: "class ClockConfig { static { TimeZone.setDefault(x); } }" }];
+    expect(runPresenceSensors([memory(clockGuard, ["src/ClockConfig.java"])], finalWithUtc)).toEqual([]);
+  });
+
+  it("is NOT run by the added-lines runner (runSensors skips require_present)", () => {
+    // An added line that lacks the marker must not false-fire the presence sensor.
+    const added = [{ path: "src/ClockConfig.java", content: "int unrelated = 1;" }];
+    expect(runSensors([memory(clockGuard, ["src/ClockConfig.java"])], added)).toEqual([]);
   });
 });
 

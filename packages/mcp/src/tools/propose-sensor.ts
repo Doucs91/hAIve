@@ -105,6 +105,15 @@ export const ProposeSensorInputSchema = {
       "red_proven: true — 'the test demonstrably catches the incident', shown in the prevention receipt.",
     ),
   flags: z.string().optional().describe("Optional regex flags (e.g. 'i' for case-insensitive)."),
+  require_present: z
+    .boolean()
+    .default(false)
+    .describe(
+      "kind=regex: make this a REQUIRED-PRESENCE invariant instead of a forbidden-pattern one. `pattern` " +
+      "then names a line that must REMAIN in the anchored file; the sensor FIRES when a change REMOVES it. " +
+      "Use for 'do not delete this critical line' lessons a diff-of-added-lines sensor cannot see. Validated " +
+      "by requiring the pattern to be PRESENT in the current anchored code (there must be something to guard).",
+    ),
   paths: z
     .array(z.string())
     .default([])
@@ -621,6 +630,63 @@ export async function proposeSensor(
   // fire on — a block pattern that matches it is inverted (it blocks the recommended fix).
   const correctExamples = extractCorrectApproachExamples(found.memory.body);
 
+  // ── Presence invariant (require_present): the pattern must REMAIN present; it fires on deletion.
+  // Validation is the inverse of the forbidden-pattern kind — the marker MUST be present in the
+  // current anchored code, or there is nothing to guard (and it would fire on every commit). ──
+  if (input.require_present) {
+    let re: RegExp;
+    try {
+      re = new RegExp(input.pattern!, input.flags ?? "");
+    } catch (err) {
+      return {
+        accepted: false,
+        memory_id: input.memory_id,
+        severity: input.severity,
+        reason: "invalid-regex",
+        guidance: `The pattern does not compile: ${String(err)}`,
+        self_check: { silent_on_current: false, fires_on_bad: null, fired_on: [] },
+      };
+    }
+    const presentIn = currentTargets.filter((t) => re.test(t.content));
+    if (currentTargets.length > 0 && presentIn.length === 0) {
+      return {
+        accepted: false,
+        memory_id: input.memory_id,
+        severity: input.severity,
+        reason: "presence-marker-absent",
+        guidance:
+          `A require_present sensor guards a line that must STAY. The pattern is not present in the ` +
+          `current anchored code (${anchorPaths.join(", ") || "no anchor paths"}), so there is nothing to ` +
+          `guard and it would fire on every commit. Anchor it to the file that contains the line, and make ` +
+          `the pattern match that line exactly.`,
+        self_check: { silent_on_current: false, fires_on_bad: null, fired_on: [] },
+      };
+    }
+    const presenceSensor: Sensor = {
+      kind: "regex",
+      pattern: input.pattern!,
+      require_present: true,
+      ...(input.flags ? { flags: input.flags } : {}),
+      paths: anchorPaths,
+      message: input.message?.trim() || deriveMessage(found.memory.body, input.pattern!, undefined),
+      ...(input.incident?.trim() ? { incident: input.incident.trim() } : {}),
+      severity: input.severity,
+      autogen: false,
+      last_fired: null,
+    };
+    await writeFile(found.filePath, serializeMemory({ frontmatter: { ...found.memory.frontmatter, sensor: presenceSensor }, body: found.memory.body }), "utf8");
+    return {
+      accepted: true,
+      memory_id: input.memory_id,
+      severity: input.severity,
+      guidance:
+        `Presence invariant accepted — the gate fires when a change removes this line from ${anchorPaths.join(", ") || "the anchored file(s)"}.` +
+        personalScopeNudge,
+      self_check: { silent_on_current: true, fires_on_bad: null, fired_on: [] },
+      file_path: found.filePath,
+    };
+  }
+
   const sensor: Sensor = {
     kind: "regex",
     pattern: input.pattern!,
@@ -660,11 +726,23 @@ export async function proposeSensor(
   };
   await writeFile(found.filePath, serializeMemory(next), "utf8");
 
+  // A warn sensor that FIRES on the current code is not a clean pass: either the pattern also matches
+  // legitimate code (permanent noise agents learn to ignore — field report §3.4), or the faulty code
+  // is merely still present (arm-then-fix). Say so instead of a bland accepted:true; a block proposal
+  // in the same state is already rejected upstream, so this only reaches warn.
+  const firesOnCurrentCaveat =
+    !verdict.self_check.silent_on_current && verdict.self_check.fired_on.length > 0
+      ? `⚠ NOT silent on the current code — it fires on: ${verdict.self_check.fired_on.join(", ")}. ` +
+        `If that code is CORRECT, this warning is noise: tighten the pattern or add an 'absent' companion. ` +
+        `If the faulty code is merely still present, fix it, then re-propose at severity "block".`
+      : "";
+  const guidance = [firesOnCurrentCaveat, personalScopeNudge.trim()].filter(Boolean).join(" ");
+
   return {
     accepted: true,
     memory_id: input.memory_id,
     severity: input.severity,
-    ...(personalScopeNudge ? { guidance: personalScopeNudge.trim() } : {}),
+    ...(guidance ? { guidance } : {}),
     self_check,
     file_path: found.filePath,
   };

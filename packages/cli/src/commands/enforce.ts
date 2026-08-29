@@ -46,6 +46,8 @@ import {
   incidentSuffix,
   resolveHaivePaths,
   runSensors,
+  runPresenceSensors,
+  changedPathsFromDiff,
   saveConfig,
   selectCommandSensors,
   sensorTargetsFromDiff,
@@ -1960,8 +1962,11 @@ async function runSensorGate(
 
     // ── Computational layer 1: deterministic regex sensors ──
     const regexSensorMemories = scannable.filter((m) => m.frontmatter.sensor!.kind === "regex");
-    const hits = regexSensorMemories.length > 0 ? runSensors(regexSensorMemories, targets) : [];
-    for (const memory of regexSensorMemories) {
+    // Presence sensors are kind=regex but evaluated separately (on final content), so keep them out
+    // of the added-lines pass and its ledger to avoid a duplicate silent row.
+    const plainRegexMemories = regexSensorMemories.filter((m) => !m.frontmatter.sensor!.require_present);
+    const hits = plainRegexMemories.length > 0 ? runSensors(plainRegexMemories, targets) : [];
+    for (const memory of plainRegexMemories) {
       const sensor = memory.frontmatter.sensor!;
       if (!targets.some((target) => sensorAppliesToPath(sensor, memory.frontmatter.anchor.paths, target.path))) continue;
       ledgerRows.push(evaluation({
@@ -2009,6 +2014,59 @@ async function runSensorGate(
     // ── Computational layer 1b: AST sensors (structural — comments/strings can't false-positive).
     // Match on the staged content of changed files; fire only when a match intersects added lines.
     // Engine missing = unrunnable → ONE aggregated warn, never a block (same honesty as commands). ──
+    // ── Computational layer 1a: presence sensors (require_present) — fire on a DELETION of a
+    // required line, which a diff-of-added-lines sensor structurally cannot see. Evaluated on the
+    // FINAL content of every file the change touched (including pure deletions). ──
+    const presenceMemories = regexSensorMemories.filter((m) => m.frontmatter.sensor!.require_present);
+    if (presenceMemories.length > 0) {
+      const finalTargets: import("@hivelore/core").SensorTarget[] = [];
+      for (const rel of changedPathsFromDiff(diff)) {
+        if (!isSensorScannablePath(rel)) continue;
+        const content = await stagedFileContent(paths.root, rel);
+        if (content !== null) finalTargets.push({ path: rel, content });
+      }
+      const presenceHits = runPresenceSensors(presenceMemories, finalTargets);
+      for (const memory of presenceMemories) {
+        const applies = finalTargets.some((t) => sensorAppliesToPath(memory.frontmatter.sensor!, memory.frontmatter.anchor.paths, t.path));
+        if (!applies) continue;
+        ledgerRows.push(evaluation({
+          memory_id: memory.frontmatter.id,
+          kind: "regex",
+          stage,
+          head_sha: headSha,
+          scope_hash: "",
+          outcome: presenceHits.some((h) => h.memory_id === memory.frontmatter.id) ? "fired" : "silent",
+        }));
+      }
+      for (const hit of presenceHits) {
+        if (seen.has(hit.memory_id)) continue;
+        seen.add(hit.memory_id);
+        firedIds.add(hit.memory_id);
+        const where = hit.file ? ` (${hit.file})` : "";
+        if (hit.severity === "block") {
+          findings.push({
+            severity: "error",
+            code: "sensor-block",
+            message: `Block presence sensor fired — ${hit.memory_id}: ${hit.message}${where}${incidentSuffix(hit.sensor.incident)}\n  a required line was removed (it must remain present in ${hit.file ?? "the anchored file"}).`,
+            fix: "Restore the required line, or if the invariant is intentionally gone, demote the sensor: `hivelore sensors promote <id> --severity warn`.",
+            impact: 45,
+            memory_ids: [hit.memory_id],
+            file: hit.file,
+          });
+        } else {
+          findings.push({
+            severity: "warn",
+            code: "sensor-warn",
+            message: `Presence sensor flagged ${hit.memory_id}: ${hit.message}${where} — a required line appears to have been removed.`,
+            fix: "Confirm the removal was intended; the lesson explains why the line must stay.",
+            impact: 5,
+            memory_ids: [hit.memory_id],
+            file: hit.file,
+          });
+        }
+      }
+    }
+
     const astSensorMemories = scannable.filter((m) => m.frontmatter.sensor!.kind === "ast");
     if (astSensorMemories.length > 0) {
       const addedByPath = addedLineNumbersFromDiff(diff);

@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveHaivePaths, type HaivePaths } from "../src/paths.js";
 import { loadPreventionEvents, recordPreventionHits } from "../src/prevention.js";
 import { runSensors, sensorTargetsFromDiff } from "../src/sensors.js";
+import { serializeMemory } from "../src/parser.js";
 import { getUsage, loadUsageIndex } from "../src/usage.js";
 import type { Memory, Sensor } from "../src/types.js";
 
@@ -105,5 +106,19 @@ describe("recordPreventionHits — the shared gate recorder", () => {
   it("is a no-op for an empty fired-id list", async () => {
     expect(await recordPreventionHits(paths, [], "sensor")).toEqual([]);
     expect(await loadPreventionEvents(paths)).toEqual([]);
+  });
+
+  it("stamps sensor.last_fired into the memory file so the catch survives a clone (§4)", async () => {
+    // usage.json is gitignored, so without this the file would show last_fired: null forever.
+    const mem = sensorMemory();
+    await mkdir(paths.teamDir, { recursive: true });
+    const file = path.join(paths.teamDir, `${mem.frontmatter.id}.md`);
+    await writeFile(file, serializeMemory(mem), "utf8");
+
+    const at = new Date("2026-08-29T12:00:00.000Z");
+    await recordPreventionHits(paths, [mem.frontmatter.id], "sensor", at);
+
+    const written = await readFile(file, "utf8");
+    expect(written).toMatch(/last_fired:\s*'?2026-08-29T12:00:00\.000Z'?/);
   });
 });

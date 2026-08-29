@@ -6,6 +6,44 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.6] — Guard a deletion, and stop the gate rubber-stamping
+
+A third field report — five sessions, 25 memories, 11 sensors — reached a sharp verdict: the anchored
+session memory is the product's real value, while the sensor layer over-promises (11 sensors, 1 fire,
+none of the five real defects caught). This release acts on the parts of that critique that are
+deterministic and testable, and records the rest as a backlog memory so the next agent knows where to
+start (`2026-08-29-decision-field-report-backlog-multi-sessions`).
+
+### Guard a deletion, not just an addition
+
+- **Presence sensors (`require_present`).** A regex sensor can now be a REQUIRED-PRESENCE invariant:
+  `pattern` names a line that must REMAIN in the anchored file, and the sensor FIRES when a change
+  removes it — evaluated on the file's final content, the one class of invariant a diff-of-added-lines
+  sensor structurally cannot see (the "don't delete the UTC default" lesson). Propose it with
+  `propose_sensor({ require_present: true })`; it is validated by requiring the marker to be present in
+  the current code (there must be something to guard). Wired into the commit/CI gate.
+
+### The gate says what it means
+
+- **An inverted sensor is refused at any severity.** A proposal whose pattern fires on the lesson's own
+  recommended-correct code was only rejected for `block`; a `warn` in the same state was silently
+  accepted and became permanent noise. It is now refused for `warn` too (field report §3.4).
+- **A warn sensor that fires on current code no longer reads as a clean pass.** `propose_sensor` returns
+  an explicit caveat naming what it fired on, instead of a bland `accepted: true` — so an agent isn't
+  nudged to arm a guard that cries on correct code.
+
+### Prevention evidence that survives a clone
+
+- **`sensor.last_fired` is stamped into the memory file** on a real prevention, not only into the
+  gitignored usage cache — so a fired guard's proof travels with the repo (field report §4). Rare and
+  debounced, so it does not churn like a per-read counter would.
+- **No trend verdict on a tiny sample.** The prevention receipt stops printing "recurrences
+  rising/declining" when the sample is too small to mean anything (a 0→1 jump is not a trend, §5).
+
+The broader items — read-telemetry visible in the repo, historising the PR receipt, trimming the
+prose-extracted sensor seed, memory-summary extraction, bridge-file dedup — are captured in the backlog
+memory with their design tradeoffs, not silently dropped.
+
 ## [0.57.5] — Guard the write path, not just the sensors
 
 Two independent field sessions on real repositories reached the same conclusion: Hivelore's rigor

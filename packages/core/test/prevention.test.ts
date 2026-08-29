@@ -53,6 +53,16 @@ describe("prevention receipt", () => {
     expect(renderPreventionReceipt(receipt)).toContain("0 repeat mistakes");
   });
 
+  it("omits the rising/declining verdict on a tiny sample — a 0→1 jump is not a trend (§5)", () => {
+    // total + previous below the floor: state the counts, never claim a direction.
+    const tiny = buildPreventionReceipt([ev(1, "one")], [], emptyUsageIndex(), {
+      since: new Date(NOW.getTime() - 7 * 86_400_000), now: NOW,
+    });
+    expect(tiny.total).toBe(1);
+    expect(renderPreventionReceipt(tiny)).toContain("1 this window vs 0 previous window");
+    expect(renderPreventionReceipt(tiny)).not.toContain("recurrences");
+  });
+
   it("treats legacy usage rows without prevented_count as zero", () => {
     const usage = emptyUsageIndex();
     usage.by_id["legacy"] = { read_count: 3 } as typeof usage.by_id[string];

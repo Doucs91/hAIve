@@ -7,10 +7,12 @@
  * capture (recurrence). Lives in `.ai/.cache/` (gitignored telemetry) — never committed, never
  * churns a release.
  */
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { LoadedMemory } from "./loader.js";
+import { loadMemoriesFromDir } from "./loader.js";
+import { serializeMemory } from "./parser.js";
 import type { HaivePaths } from "./paths.js";
 import {
   getUsage,
@@ -81,7 +83,29 @@ export async function recordPreventionHits(
   for (const id of recordedIds) {
     await appendPreventionEvent(paths, { at, id, source, ...details[id] }).catch(() => { /* best-effort */ });
   }
+  // Durable proof: stamp `sensor.last_fired` into the memory file itself. `usage.json` lives in the
+  // gitignored cache, so a fresh clone otherwise inherits sensors with no record they ever fired
+  // (field report §4: 0/11 last_fired). This is a rare, debounced event — one line changes on a real
+  // catch — so it does not churn like a per-read counter would. Best-effort: never break the gate.
+  await stampSensorLastFired(paths, recordedIds, at).catch(() => { /* best-effort */ });
   return recordedIds;
+}
+
+/**
+ * Write `sensor.last_fired` into the frontmatter of each memory that just recorded a prevention, so
+ * the "this guard has demonstrably caught something" signal survives a clone (it otherwise lives only
+ * in gitignored `usage.json`). Only rewrites a file whose value actually changed.
+ */
+async function stampSensorLastFired(paths: HaivePaths, ids: string[], at: string): Promise<void> {
+  if (ids.length === 0 || !existsSync(paths.memoriesDir)) return;
+  const wanted = new Set(ids);
+  const loaded = await loadMemoriesFromDir(paths.memoriesDir);
+  for (const { memory, filePath } of loaded) {
+    const fm = memory.frontmatter;
+    if (!wanted.has(fm.id) || !fm.sensor || fm.sensor.last_fired === at) continue;
+    const next = { ...memory, frontmatter: { ...fm, sensor: { ...fm.sensor, last_fired: at } } };
+    await writeFile(filePath, serializeMemory(next), "utf8").catch(() => { /* best-effort */ });
+  }
 }
 
 export interface PreventionReceiptRow {
@@ -179,6 +203,17 @@ export function buildPreventionReceipt(
   };
 }
 
+/**
+ * Trend clause for a prevention receipt. Below a handful of total catches the "rising/declining"
+ * verdict is statistical noise (a 0→1 jump is not a trend) — and a noisy claim discredits the real
+ * ones next to it (field report §5). So under the floor we state only the counts, no verdict.
+ */
+function trendClause(total: number, previous: number): string {
+  const counts = `${total} this window vs ${previous} previous window`;
+  if (total + previous < 3) return counts;
+  return `${counts} (${total <= previous ? "recurrences declining" : "recurrences rising"})`;
+}
+
 export function renderPreventionReceipt(receipt: PreventionReceipt): string {
   const lines = [
     `Hivelore prevention receipt — last ${receipt.window_days} days`,
@@ -199,10 +234,7 @@ export function renderPreventionReceipt(receipt: PreventionReceipt): string {
     const red = row.red_proven ? "  ✓ RED-proven" : "";
     lines.push(`  ✗→✓ ${row.at.slice(0, 10)}  ${row.id.padEnd(32)} (${kind}${exit}${stage})${incident}${red}`);
   }
-  lines.push(
-    `  Trend: ${receipt.total} this window vs ${receipt.previous_total} previous window ` +
-    `(${receipt.total <= receipt.previous_total ? "recurrences declining" : "recurrences rising"}).`,
-  );
+  lines.push(`  Trend: ${trendClause(receipt.total, receipt.previous_total)}.`);
   return lines.join("\n");
 }
 
@@ -243,8 +275,7 @@ export function renderPreventionReceiptShare(receipt: PreventionReceipt): string
     }
     lines.push(
       "",
-      `_Trend: ${receipt.total} this window vs ${receipt.previous_total} previous window ` +
-      `(${receipt.total <= receipt.previous_total ? "recurrences declining" : "recurrences rising"})._`,
+      `_Trend: ${trendClause(receipt.total, receipt.previous_total)}._`,
     );
   }
   lines.push("", `<sub>${HIVELORE_ATTRIBUTION}</sub>`);

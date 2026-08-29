@@ -197,11 +197,70 @@ export function runSensors(
   for (const memory of memories) {
     const sensor = memory.frontmatter.sensor;
     if (!sensor || sensor.kind !== "regex") continue;
+    // Presence sensors are evaluated on FINAL file content (they fire on a deletion), not on added
+    // diff lines — running them here would false-fire on any added line that lacks the marker.
+    if (sensor.require_present) continue;
     const anchorPaths = memory.frontmatter.anchor.paths;
     for (const target of targets) {
       if (!sensorAppliesToPath(sensor, anchorPaths, target.path)) continue;
       const hit = runRegexSensor(memory.frontmatter.id, sensor, target);
       if (hit) hits.push(hit);
+    }
+  }
+  return hits;
+}
+
+/**
+ * Parse every touched file path out of a unified diff (`diff --git a/X b/X` headers), including
+ * files changed by pure DELETIONS — the case a presence sensor exists for. Pure.
+ */
+export function changedPathsFromDiff(diff: string): string[] {
+  const out = new Set<string>();
+  for (const m of diff.matchAll(/^diff --git a\/(.+?) b\/(.+)$/gm)) {
+    out.add((m[2] ?? m[1] ?? "").trim());
+  }
+  // Fallback for header-less diffs (some callers pass a bare `+++ b/path` hunk).
+  for (const m of diff.matchAll(/^\+\+\+ b\/(.+)$/gm)) {
+    const p = (m[1] ?? "").trim();
+    if (p && p !== "/dev/null") out.add(p);
+  }
+  return [...out];
+}
+
+/**
+ * Run REQUIRED-PRESENCE regex sensors (`require_present`) against the FINAL content of touched files.
+ * Fires when the required `pattern` is ABSENT from a file the change touched — i.e. the guarded line
+ * was removed. Deterministic and side-effect-free; the caller supplies the final file contents.
+ */
+export function runPresenceSensors(
+  memories: Memory[],
+  finalTargets: SensorTarget[],
+): SensorHit[] {
+  const hits: SensorHit[] = [];
+  for (const memory of memories) {
+    const sensor = memory.frontmatter.sensor;
+    if (!sensor || sensor.kind !== "regex" || !sensor.require_present || !sensor.pattern) continue;
+    let re: RegExp;
+    try {
+      const flags = new Set(["m", ...(sensor.flags ?? "").split("")].filter(Boolean));
+      re = new RegExp(sensor.pattern, [...flags].join(""));
+    } catch {
+      continue;
+    }
+    const anchorPaths = memory.frontmatter.anchor.paths;
+    for (const target of finalTargets) {
+      if (!sensorAppliesToPath(sensor, anchorPaths, target.path)) continue;
+      re.lastIndex = 0;
+      if (!re.test(target.content)) {
+        hits.push({
+          memory_id: memory.frontmatter.id,
+          sensor,
+          file: target.path,
+          message: sensor.message,
+          severity: sensor.severity,
+        });
+        break; // one hit per memory
+      }
     }
   }
   return hits;
@@ -625,15 +684,16 @@ export function judgeProposedSensor(
 ): ProposedSensorVerdict {
   const brittle = sensor.kind === "regex" && sensor.pattern ? sensorPatternBrittleness(sensor.pattern) : null;
   const self_check = sensorSelfCheck(sensor, input);
+  // An inverted sensor — one that fires on the lesson's OWN recommended-correct code — is noise at
+  // ANY severity: a warn that cries on correct code trains agents to ignore it, and it will be
+  // ignored the day it is right too (field report §3.4). Reject it before the severity split.
+  if (self_check.fires_on_correct === true) {
+    return { accepted: false, reason: "fires-on-correct", self_check, brittle };
+  }
   if (sensor.severity === "block") {
     if (brittle) return { accepted: false, reason: "brittle", self_check, brittle };
     if (input.currentTargets.length > 0 && !self_check.silent_on_current) {
       return { accepted: false, reason: "fires-on-current", self_check, brittle };
-    }
-    // An inverted sensor (fires on the recommended fix) is worse than useless — it blocks the
-    // correct code and never the mistake. Reject before the weaker missed-bad-example check.
-    if (self_check.fires_on_correct === true) {
-      return { accepted: false, reason: "fires-on-correct", self_check, brittle };
     }
     if (self_check.fires_on_bad === false) {
       return { accepted: false, reason: "missed-bad-example", self_check, brittle };
