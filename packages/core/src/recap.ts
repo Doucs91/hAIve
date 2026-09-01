@@ -78,3 +78,43 @@ export function recapBriefingExcerpt(body: string, maxChars = 700): string {
   if (out.length > maxChars) out = out.slice(0, maxChars).trimEnd() + "…";
   return out;
 }
+
+/** Heading that separates the current recap from the archived per-session history. */
+export const RECAP_HISTORY_HEADING = "## Session history";
+/** How many past sessions to retain — bounded so the recap file cannot grow without limit. */
+export const RECAP_HISTORY_MAX = 6;
+
+/** One compact history entry for a past session: date + goal + next steps (not the whole body). */
+function summarizeRecapForHistory(mainBody: string, dateISO: string): string {
+  const goal = mainBody.match(/##+\s*Goal[^\n]*\n+([^\n]+)/i)?.[1]?.trim() ?? "";
+  const next = mainBody.match(/##+\s*Next steps?[^\n]*\n([\s\S]*?)(?=\n##+\s|$)/i)?.[1]?.trim() ?? "";
+  const date = /^\d{4}-\d{2}-\d{2}/.test(dateISO) ? dateISO.slice(0, 10) : dateISO;
+  const lines = [`### ${date}`];
+  if (goal) lines.push(goal);
+  if (next) lines.push(`**Next:** ${next.replace(/\s*\n+\s*/g, " ").slice(0, 300)}`);
+  return lines.join("\n");
+}
+
+/**
+ * Fold the previous recap into a bounded per-session history so a topic-upsert stops destroying the
+ * record of earlier sessions (field report 2026-09-01 §5.6: "I can't know what the last three
+ * sessions did"). The NEW session's full recap stays at the top — so `recapBriefingExcerpt` still
+ * surfaces only the latest goal + next steps — with the previous session archived as one compact
+ * entry beneath a `## Session history` heading, capped at {@link RECAP_HISTORY_MAX} entries. Pure.
+ */
+export function buildRecapWithHistory(
+  newMainBody: string,
+  previousBody: string | null,
+  previousDateISO: string | null,
+  maxEntries = RECAP_HISTORY_MAX,
+): string {
+  if (!previousBody?.trim()) return newMainBody;
+  const marker = `\n${RECAP_HISTORY_HEADING}`;
+  const idx = previousBody.indexOf(marker);
+  const prevMain = (idx >= 0 ? previousBody.slice(0, idx) : previousBody).trimEnd();
+  const prevHistory = idx >= 0 ? previousBody.slice(idx + marker.length).replace(/^\s+/, "").trimEnd() : "";
+  const archived = summarizeRecapForHistory(prevMain, previousDateISO ?? new Date().toISOString());
+  const combined = [archived, prevHistory].filter(Boolean).join("\n\n");
+  const kept = combined.split(/\n(?=### )/).slice(0, maxEntries).join("\n");
+  return `${newMainBody.trimEnd()}\n\n${RECAP_HISTORY_HEADING}\n\n${kept}\n`;
+}

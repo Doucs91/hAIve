@@ -18,6 +18,7 @@ import {
   loadPreventionEvents,
   readUsageEvents,
   loadUsageIndex,
+  buildRecapWithHistory,
   memoryFilePath,
   renderCaughtForYou,
   resolveHaivePaths,
@@ -532,7 +533,9 @@ export function registerSessionEnd(session: Command): void {
               paths: filesTouched.length ? filesTouched : fm.anchor.paths,
             },
           };
-          await writeFile(topicMatch.filePath, serializeMemory({ frontmatter: newFrontmatter, body }), "utf8");
+          // Archive the outgoing recap into a bounded per-session history instead of overwriting (§5.6).
+          const combinedBody = buildRecapWithHistory(body, topicMatch.memory.body, fm.verified_at ?? fm.created_at);
+          await writeFile(topicMatch.filePath, serializeMemory({ frontmatter: newFrontmatter, body: combinedBody }), "utf8");
           await cleanupObservations();
           if (!opts.quiet) {
             ui.success(`Session recap updated (revision #${revisionCount})`);

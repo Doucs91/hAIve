@@ -6,6 +6,27 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.58.1] — Recaps keep their history; sensors nudge toward AST
+
+### The recap stops forgetting the last three sessions (§5.6)
+
+- **A topic-upsert recap now archives the outgoing session into a bounded per-session history** instead
+  of overwriting it. The field report could not tell what the previous three sessions did, because
+  each `mem_session_end` overwrote the last (`revision_count: 12`, history gone). The newest recap
+  still sits at the top — so the briefing head keeps surfacing only the latest goal + next steps
+  (v0.58.0) — with each prior session kept as one compact dated entry beneath a `## Session history`
+  heading, capped at 6. The full record is one `mem_get <id>` away. Applied to both the MCP and CLI
+  session-end writers via the pure `buildRecapWithHistory`.
+
+### `propose_sensor` points at AST for parseable languages (§3.1)
+
+- **The `kind` guidance now recommends `ast` for a parseable language when the engine is available.**
+  A structural AST match can never false-positive on a comment or a string; regex (still the default,
+  since it needs no extra engine) now strips comments before matching but deliberately keeps string
+  literals so it can still target a bad literal. The default is unchanged — flipping it to AST would
+  break sensor creation everywhere the optional `@ast-grep/napi` engine is not installed — but the
+  nudge is now explicit rather than buried.
+
 ## [0.58.0] — Stop the noise: no junk seeds, no zero-count receipts, quieter gate, leaner recap
 
 Acts on the "remove / transform" backlog from the 2026-09-01 field report (§5, §7). The theme is

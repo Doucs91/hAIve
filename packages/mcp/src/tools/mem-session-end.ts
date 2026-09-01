@@ -11,6 +11,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   buildFrontmatter,
+  buildRecapWithHistory,
   loadMemoriesFromDir,
   memoryFilePath,
   serializeMemory,
@@ -140,9 +141,11 @@ export async function memSessionEnd(
         paths: normalizedFiles.length ? normalizedFiles : fm.anchor.paths,
       },
     };
+    // Archive the outgoing recap into a bounded per-session history instead of overwriting it (§5.6).
+    const combinedBody = buildRecapWithHistory(body, topicMatch.memory.body, fm.verified_at ?? fm.created_at);
     await writeFile(
       topicMatch.filePath,
-      serializeMemory({ frontmatter: newFrontmatter, body }),
+      serializeMemory({ frontmatter: newFrontmatter, body: combinedBody }),
       "utf8",
     );
     // Clear pending distill — a manual post_task flow completed successfully.

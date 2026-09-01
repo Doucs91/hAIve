@@ -40,10 +40,13 @@ export const ProposeSensorInputSchema = {
     .enum(["regex", "ast", "shell", "test"])
     .default("regex")
     .describe(
-      "regex = pattern matched on added diff lines (default). ast = an ast-grep STRUCTURAL pattern " +
-      "(e.g. 'stripe.paymentIntents.create($$$)') matched on the AST of changed files — comments and " +
-      "strings can never false-positive; `absent` is a sub-pattern that must be missing INSIDE the " +
-      "match (requires the optional @ast-grep/napi engine). shell|test = a COMMAND the gate runs " +
+      "regex = pattern matched on added diff lines (default; comments are stripped before matching, " +
+      "but string literals are NOT — so a regex can still target a bad literal in a string). ast = an " +
+      "ast-grep STRUCTURAL pattern (e.g. 'stripe.paymentIntents.create($$$)') matched on the AST of " +
+      "changed files — comments AND strings can never false-positive, so PREFER ast for a parseable " +
+      "language (JS/TS, Python, Go, Java, Rust, …) when the @ast-grep/napi engine is available; " +
+      "`absent` is a sub-pattern that must be missing INSIDE the match (requires that optional engine). " +
+      "shell|test = a COMMAND the gate runs " +
       "when the diff touches the sensor's paths — routes the team's own oracle (an existing test, an " +
       "invariant script) to this lesson. Command sensors only execute where enforcement.runCommandSensors=true.",
     ),

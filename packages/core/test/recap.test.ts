@@ -1,6 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { compactAutoRecapBody, isAutoRecap, recapBriefingExcerpt } from "../src/recap.js";
+import { compactAutoRecapBody, isAutoRecap, recapBriefingExcerpt, buildRecapWithHistory } from "../src/recap.js";
 import { isEnvWorkaroundMemory } from "../src/relevance.js";
+
+describe("buildRecapWithHistory (field report 2026-09-01 §5.6)", () => {
+  const mkRecap = (goal: string, next: string) =>
+    `## Goal\n${goal}\n\n## Accomplished\n- did work\n\n## Next steps\n${next}`;
+
+  it("returns the new body unchanged when there is no previous recap", () => {
+    const body = mkRecap("Session A", "do X");
+    expect(buildRecapWithHistory(body, null, null)).toBe(body);
+  });
+
+  it("archives the previous session into a bounded history without losing it", () => {
+    const prev = mkRecap("Session A", "finish the refactor");
+    const next = mkRecap("Session B", "write the tests");
+    const out = buildRecapWithHistory(next, prev, "2026-08-30T10:00:00.000Z");
+    // New session stays on top…
+    expect(out.indexOf("Session B")).toBeLessThan(out.indexOf("## Session history"));
+    // …and the previous one is preserved as a dated entry.
+    expect(out).toContain("## Session history");
+    expect(out).toContain("### 2026-08-30");
+    expect(out).toContain("Session A");
+    expect(out).toContain("finish the refactor");
+    // The briefing excerpt still surfaces only the LATEST goal + next steps, not the history.
+    const excerpt = recapBriefingExcerpt(out);
+    expect(excerpt).toContain("Session B");
+    expect(excerpt).toContain("write the tests");
+    expect(excerpt).not.toContain("Session A");
+  });
+
+  it("caps history at maxEntries, dropping the oldest", () => {
+    let body = mkRecap("goal01", "next01");
+    for (let i = 2; i <= 10; i++) {
+      const n = String(i).padStart(2, "0");
+      body = buildRecapWithHistory(mkRecap(`goal${n}`, `next${n}`), body, `2026-08-${n}T00:00:00.000Z`, 3);
+    }
+    const entries = (body.match(/^### /gm) ?? []).length;
+    expect(entries).toBe(3); // only the 3 most recent past sessions retained
+    expect(body).toContain("next09"); // a recent past session is kept
+    expect(body).not.toContain("next01"); // oldest dropped
+  });
+});
 
 describe("recapBriefingExcerpt (field report 2026-09-01 §5.6)", () => {
   const human = [
