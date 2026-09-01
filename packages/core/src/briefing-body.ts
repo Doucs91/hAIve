@@ -49,8 +49,25 @@ export function extractActionsBriefBody(markdown: string, maxChars = MAX_DEFAULT
   }
   if (buf.length) paragraphs.push(buf.join(" ").trim());
 
-  let out = paragraphs[0] ?? stripped.slice(0, maxChars);
-  if (!out.trim()) out = stripped.slice(0, maxChars);
+  if (paragraphs.length === 0) {
+    let out = stripped.slice(0, maxChars);
+    if (out.length > maxChars) out = out.slice(0, maxChars).trimEnd() + "…";
+    return out;
+  }
+
+  // Accumulate as many paragraphs as fit — not just the first. A must-read memory that opens with a
+  // short delivery-log accroche ("Lot 8, livré le 2026-08-31.") keeps its actual substance in the
+  // paragraphs that follow; returning only paragraphs[0] truncated it to the accroche and dropped
+  // everything the agent needed (field report 2026-09-01 §5.2, reported twice).
+  const collected: string[] = [];
+  let length = 0;
+  for (const paragraph of paragraphs) {
+    const cost = (collected.length ? 2 : 0) + paragraph.length;
+    if (collected.length > 0 && length + cost > maxChars) break;
+    collected.push(paragraph);
+    length += cost;
+  }
+  let out = collected.join("\n\n");
   if (out.length > maxChars) out = out.slice(0, maxChars).trimEnd() + "…";
   return out;
 }

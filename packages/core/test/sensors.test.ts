@@ -117,6 +117,52 @@ describe("sensors", () => {
     expect(hit).toBeNull();
   });
 
+  it("does not fire on a pattern that only appears inside a comment (field report 2026-09-01 §3.1)", () => {
+    const colour = sensor({ pattern: "bg-emerald-600", severity: "block" });
+    // CSS block comment documenting the rule — must NOT trip the sensor that enforces it.
+    expect(
+      runRegexSensor("m1", colour, {
+        path: "src/index.css",
+        content: "/* This is the only source of colours. A class like bg-emerald-600 is forbidden. */",
+      }),
+    ).toBeNull();
+    // Javadoc continuation line naming the forbidden call — must NOT fire.
+    const now = sensor({ pattern: "LocalDate\\.now\\(", severity: "block" });
+    expect(
+      runRegexSensor("m1", now, {
+        path: "src/main/java/Slots.java",
+        content: " * Never call LocalDate.now() here — pass the salon clock instead.",
+      }),
+    ).toBeNull();
+    // `//` line comment naming the pattern — must NOT fire.
+    expect(
+      runRegexSensor("m1", colour, {
+        path: "src/App.tsx",
+        content: "const x = 1; // avoid bg-emerald-600 in JSX",
+      }),
+    ).toBeNull();
+  });
+
+  it("still fires when the pattern appears in real code, not just prose", () => {
+    const colour = sensor({ pattern: "bg-emerald-600", severity: "block" });
+    // A className string is CODE, not a comment — string literals stay intact so this still fires.
+    const hit = runRegexSensor("m1", colour, {
+      path: "src/App.tsx",
+      content: 'const cls = "bg-emerald-600";',
+    });
+    expect(hit).not.toBeNull();
+    expect(hit!.matched_line).toContain("bg-emerald-600");
+  });
+
+  it("does not mistake a URL's // inside a string for a line comment", () => {
+    const s = sensor({ pattern: "example\\.com", severity: "block" });
+    const hit = runRegexSensor("m1", s, {
+      path: "src/App.ts",
+      content: 'const url = "https://example.com/path";',
+    });
+    expect(hit).not.toBeNull();
+  });
+
   it("downgrades a brittle block sensor to warn at match time (never hard-blocks)", () => {
     const brittle = sensor({ pattern: "enforce\\.ts\\s*:\\s*1131-1186", severity: "block" });
     const hit = runRegexSensor("m1", brittle, { path: "x.ts", content: "see enforce.ts: 1131-1186 here" });

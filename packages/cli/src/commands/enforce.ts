@@ -3169,6 +3169,29 @@ jobs:
             gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \\
               -F body=@"$RUNNER_TEMP/hivelore-receipt.md" >/dev/null 2>&1 || true
           fi
+      - name: Report enforcement result
+        if: always()
+        run: |
+          gate="$RUNNER_TEMP/hivelore-gate.json"
+          if [ ! -f "$gate" ]; then
+            echo "No enforcement output was produced." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## Hivelore enforcement"
+            echo
+            if command -v jq >/dev/null 2>&1; then
+              blocking="$(jq -r '[.findings[]? | select(.severity=="error")] | length' "$gate" 2>/dev/null || echo 0)"
+              if [ "\${blocking:-0}" -gt 0 ]; then
+                echo "**Refused — \${blocking} blocking finding(s):**"; echo
+              else
+                echo "**Passed** — no blocking findings."; echo
+              fi
+              jq -r '.findings[]? | "- **" + (.code // "finding") + "** (" + (.severity // "info") + "): " + (.message // "") + (if .matched_line then "\\n  matched: " + .matched_line else "" end) + (if .fix then "\\n  fix: " + .fix else "" end)' "$gate" 2>/dev/null || cat "$gate"
+            else
+              cat "$gate"
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Fail when enforcement blocked
         if: steps.gate.outputs.exit_code != '0'
         run: exit \${{ steps.gate.outputs.exit_code }}

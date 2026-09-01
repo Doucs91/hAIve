@@ -137,6 +137,103 @@ function compileAbsentRegex(sensor: Sensor): RegExp | null {
 }
 
 /**
+ * Comment syntax for a file family. A regex sensor targets CODE; when its pattern also matches the
+ * prose of a comment that DOCUMENTS the very rule the sensor enforces, it punishes the author for
+ * explaining the rule next to the code it guards. Field report 2026-09-01 §3.1: a CSS block comment
+ * naming `bg-emerald-600` and a Javadoc line naming `LocalDate.now()` both tripped block sensors,
+ * costing a full CI cycle each and forcing the docs to stop naming what they forbid. We blank comment
+ * spans before matching so the pattern only sees code.
+ *
+ * String literals are LEFT INTACT on purpose: many sensors legitimately target a bad literal inside a
+ * string (a hardcoded colour class, URL, or secret), so stripping strings would blind them.
+ */
+interface CommentSyntax {
+  /** Line-comment starters that run to end-of-line when seen outside a string. */
+  line: string[];
+  /** Block-comment open/close pair, or null. */
+  block: [string, string] | null;
+  /** Blank a line whose trimmed text begins with `*` — a block-comment continuation (Javadoc/JSDoc). */
+  starContinuation: boolean;
+}
+
+const C_FAMILY: CommentSyntax = { line: ["//"], block: ["/*", "*/"], starContinuation: true };
+const HASH_FAMILY: CommentSyntax = { line: ["#"], block: null, starContinuation: false };
+const CSS_FAMILY: CommentSyntax = { line: [], block: ["/*", "*/"], starContinuation: true };
+const SCSS_FAMILY: CommentSyntax = { line: ["//"], block: ["/*", "*/"], starContinuation: true };
+const SQL_FAMILY: CommentSyntax = { line: ["--"], block: ["/*", "*/"], starContinuation: false };
+const HTML_FAMILY: CommentSyntax = { line: [], block: ["<!--", "-->"], starContinuation: false };
+
+const COMMENT_SYNTAX_BY_EXT: Record<string, CommentSyntax> = {
+  ts: C_FAMILY, tsx: C_FAMILY, js: C_FAMILY, jsx: C_FAMILY, mjs: C_FAMILY, cjs: C_FAMILY,
+  java: C_FAMILY, c: C_FAMILY, h: C_FAMILY, cpp: C_FAMILY, hpp: C_FAMILY, cc: C_FAMILY, hh: C_FAMILY,
+  cs: C_FAMILY, go: C_FAMILY, rs: C_FAMILY, kt: C_FAMILY, kts: C_FAMILY, swift: C_FAMILY,
+  scala: C_FAMILY, php: C_FAMILY, dart: C_FAMILY, m: C_FAMILY, mm: C_FAMILY,
+  py: HASH_FAMILY, rb: HASH_FAMILY, sh: HASH_FAMILY, bash: HASH_FAMILY, zsh: HASH_FAMILY,
+  yml: HASH_FAMILY, yaml: HASH_FAMILY, toml: HASH_FAMILY, properties: HASH_FAMILY,
+  conf: HASH_FAMILY, cfg: HASH_FAMILY, pl: HASH_FAMILY, pm: HASH_FAMILY, r: HASH_FAMILY,
+  css: CSS_FAMILY, scss: SCSS_FAMILY, less: SCSS_FAMILY,
+  sql: SQL_FAMILY,
+  html: HTML_FAMILY, htm: HTML_FAMILY, xml: HTML_FAMILY, vue: HTML_FAMILY, svelte: HTML_FAMILY,
+  md: HTML_FAMILY, markdown: HTML_FAMILY,
+};
+
+function commentSyntaxForPath(path: string): CommentSyntax | null {
+  const base = path.split(/[\\/]/).pop() ?? "";
+  const dot = base.lastIndexOf(".");
+  if (dot < 0) return null;
+  return COMMENT_SYNTAX_BY_EXT[base.slice(dot + 1).toLowerCase()] ?? null;
+}
+
+/** Blank the comment spans of one line, preserving column positions (comment chars → spaces). */
+function blankCommentsOnLine(line: string, syntax: CommentSyntax): string {
+  // A block-comment continuation (`* @param`, `*/`, or a lone `*`) is entirely prose. Require the
+  // `*` to be followed by whitespace / `/` / end so real code like `*ptr` or `*= 2` is left alone.
+  if (syntax.starContinuation && /^\*(\s|\/|$)/.test(line.trimStart())) {
+    return " ".repeat(line.length);
+  }
+  let out = "";
+  let stringDelim: string | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]!;
+    if (stringDelim) {
+      out += ch;
+      if (ch === "\\" && i + 1 < line.length) { out += line[i + 1]!; i++; continue; }
+      if (ch === stringDelim) stringDelim = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") { stringDelim = ch; out += ch; continue; }
+    if (syntax.block) {
+      const [open, close] = syntax.block;
+      if (line.startsWith(open, i)) {
+        const closeIdx = line.indexOf(close, i + open.length);
+        const end = closeIdx === -1 ? line.length : closeIdx + close.length;
+        out += " ".repeat(end - i);
+        if (closeIdx === -1) break;
+        i = end - 1;
+        continue;
+      }
+    }
+    let hitLineComment = false;
+    for (const lc of syntax.line) {
+      if (line.startsWith(lc, i)) { out += " ".repeat(line.length - i); hitLineComment = true; break; }
+    }
+    if (hitLineComment) break;
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * Blank comment spans in scannable text so a sensor's regex matches CODE, not the prose that
+ * documents it. Returns `content` unchanged for unknown file types. Pure.
+ */
+export function stripCommentsForScan(content: string, path: string): string {
+  const syntax = commentSyntaxForPath(path);
+  if (!syntax) return content;
+  return content.split("\n").map((l) => blankCommentsOnLine(l, syntax)).join("\n");
+}
+
+/**
  * Run a single regex sensor over one target. Returns the first matching line as a hit,
  * or null. Deterministic and side-effect-free.
  */
@@ -148,12 +245,16 @@ export function runRegexSensor(
   const re = compileRegexSensor(sensor);
   if (!re) return null;
   const absentRe = compileAbsentRegex(sensor);
-  const lines = target.content.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const rawLine = lines[i]!;
+  const rawLines = target.content.split("\n");
+  // Match against comment-stripped lines so a rule's own documentation can't trip its sensor, but
+  // report the ORIGINAL line so the agent sees real content.
+  const scanLines = stripCommentsForScan(target.content, target.path).split("\n");
+  for (let i = 0; i < rawLines.length; i++) {
+    const rawLine = rawLines[i]!;
+    const scanLine = scanLines[i] ?? rawLine;
     // Fresh lastIndex each line (no global flag is forced, but be defensive).
     re.lastIndex = 0;
-    if (!re.test(rawLine)) continue;
+    if (!re.test(scanLine)) continue;
 
     // Discriminating sensor: the trigger matched, but if the correct-usage marker (`absent`) is
     // present within the window around this match, this is a LEGITIMATE use — skip it and keep
@@ -161,9 +262,9 @@ export function runRegexSensor(
     // "fires only on the faulty call".
     if (absentRe) {
       const from = Math.max(0, i - SENSOR_ABSENT_LOOKBACK);
-      const to = Math.min(lines.length, i + SENSOR_ABSENT_WINDOW + 1);
+      const to = Math.min(scanLines.length, i + SENSOR_ABSENT_WINDOW + 1);
       absentRe.lastIndex = 0;
-      if (absentRe.test(lines.slice(from, to).join("\n"))) continue;
+      if (absentRe.test(scanLines.slice(from, to).join("\n"))) continue;
     }
 
     // A brittle pattern (hardcoded line numbers, etc.) must never hard-block, even if a human

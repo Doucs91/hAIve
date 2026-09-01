@@ -6,6 +6,35 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.7] — Stop the sensors punishing the docs that explain them
+
+A fourth field report (nine sessions, 40 memories, 16 sensors) found the sensor layer had crossed from
+neutral to net-negative: the only three sensors that ever fired all fired on prose — a CSS comment, a
+Javadoc, and a correct test — costing a CI cycle each and training the author to stop naming the rule
+next to the code it guards. This release fixes the three highest-yield, deterministic items from that
+report (§8).
+
+### Sensors match code, not the comments that document them
+
+- **Regex sensors blank comment spans before matching** (field report §3.1). A CSS block comment naming
+  `bg-emerald-600`, a Javadoc line naming `LocalDate.now()`, and a `//` line comment no longer trip the
+  sensors that enforce those rules. String literals are left intact on purpose — many sensors
+  legitimately target a bad literal inside a string (a hardcoded colour class, URL, or secret), so a
+  `className="bg-emerald-600"` still fires. Covers C-family, hash, CSS/SCSS, SQL, and HTML/Markdown
+  comment syntaxes (`stripCommentsForScan`), reporting the original line.
+
+### The CI gate says why it refused
+
+- **Enforcement failures now print the findings** to the job log and `$GITHUB_STEP_SUMMARY` — code,
+  severity, matched line, and fix — instead of a bare `exit 2` no one could read (field report §4.2).
+  Applied to this repo's workflow and to the template `hivelore init` writes into every repo.
+
+### Must-read memories arrive with their substance
+
+- **`format: "actions"` no longer truncates a memory to its opening sentence** (field report §5.2). A
+  memory that opens with a short delivery accroche ("Lot 8, livré le…") then carries its real content in
+  the following prose now returns as many paragraphs as fit the budget, not just the first.
+
 ## [0.57.6] — Guard a deletion, and stop the gate rubber-stamping
 
 A third field report — five sessions, 25 memories, 11 sensors — reached a sharp verdict: the anchored
