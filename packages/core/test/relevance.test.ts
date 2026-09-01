@@ -6,6 +6,8 @@ import {
   memoryHasExcludedTag,
   memoryMatchesAnchorPaths,
   pathsOverlap,
+  adaptiveSemanticFloor,
+  ADAPTIVE_FLOOR_MIN_SAMPLES,
 } from "../src/relevance.js";
 import { DEFAULT_BRIEFING_EXCLUDE_TAGS } from "../src/config.js";
 import type { Memory } from "../src/types.js";
@@ -16,6 +18,30 @@ function memoryWithPaths(paths: string[]): Memory {
     body: "",
   };
 }
+
+describe("adaptiveSemanticFloor (field report 2026-09-01 §4.1)", () => {
+  it("does nothing below the sample threshold — small corpora rank exactly as before", () => {
+    const few = [0.7, 0.6, 0.5];
+    expect(few.length).toBeLessThan(ADAPTIVE_FLOOR_MIN_SAMPLES);
+    expect(adaptiveSemanticFloor(few, 0)).toBe(0);
+    expect(adaptiveSemanticFloor(few, 0.25)).toBe(0.25);
+  });
+
+  it("raises the bar toward the mass on a compressed distribution, but never past the top hit", () => {
+    // 16 hits packed in a narrow band (the reported failure): everything ~0.54–0.66.
+    const compressed = [0.66, 0.64, 0.63, 0.62, 0.61, 0.6, 0.59, 0.59, 0.58, 0.58, 0.57, 0.56, 0.56, 0.55, 0.55, 0.54];
+    const floor = adaptiveSemanticFloor(compressed, 0);
+    const top = Math.max(...compressed);
+    expect(floor).toBeGreaterThan(0.55); // trims the undifferentiated mass
+    expect(floor).toBeLessThan(top); // never excludes the genuine winner
+    expect(compressed.some((s) => s >= floor)).toBe(true); // list stays non-empty
+  });
+
+  it("never drops below an explicit caller floor", () => {
+    const scores = Array.from({ length: 20 }, (_, i) => 0.3 + i * 0.01);
+    expect(adaptiveSemanticFloor(scores, 0.9)).toBe(0.9);
+  });
+});
 
 describe("extractReferencedPaths (context grounding)", () => {
   it("extracts file paths from backticks and bare text, requiring slash + extension", () => {

@@ -1,6 +1,6 @@
 {
   "name": "@hivelore/cli",
-  "version": "0.57.7",
+  "version": "0.57.8",
   "description": "Hivelore CLI - the deterministic policy gate for agent-written code (rules live as repo-native team memory)",
   "license": "Apache-2.0",
   "repository": {

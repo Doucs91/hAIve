@@ -174,6 +174,40 @@ function globLiteralPrefix(pattern: string): string {
   return slash < 0 ? "" : norm.slice(0, slash);
 }
 
+/** Below this many semantic hits a distribution is not meaningful — behave exactly as before. */
+export const ADAPTIVE_FLOOR_MIN_SAMPLES = 12;
+
+/**
+ * A distribution-aware floor for semantic-only hits.
+ *
+ * Field report 2026-09-01 §4.1: on a broad corpus (~40 memories) cosine scores compress into a
+ * narrow band (everything > 0.55), so an ABSOLUTE `min_semantic_score` sorts nothing — the same
+ * three or four unrelated memories surface for every task at ~0.6. The fix the report asks for is
+ * to judge a score against the corpus distribution rather than in the absolute.
+ *
+ * This returns `mean + halfStdDev`, which self-adjusts: on a compressed distribution it rises toward
+ * the mean and trims the undifferentiated mass; on a discriminating one it sits between the winner
+ * and the noise. It NEVER drops below the caller's explicit floor, NEVER excludes the single top
+ * hit, and does nothing at all below {@link ADAPTIVE_FLOOR_MIN_SAMPLES} samples (so small corpora —
+ * and the retrieval eval — are unaffected). Pure.
+ */
+export function adaptiveSemanticFloor(scores: number[], explicitFloor = 0): number {
+  if (scores.length < ADAPTIVE_FLOOR_MIN_SAMPLES) return explicitFloor;
+  let sum = 0;
+  let top = -Infinity;
+  for (const s of scores) {
+    sum += s;
+    if (s > top) top = s;
+  }
+  const mean = sum / scores.length;
+  let variance = 0;
+  for (const s of scores) variance += (s - mean) ** 2;
+  const std = Math.sqrt(variance / scores.length);
+  const distributional = mean + 0.5 * std;
+  // Never exclude the genuine top hit (keep the list non-empty), never go below the explicit floor.
+  return Math.max(explicitFloor, Math.min(distributional, top - 1e-6));
+}
+
 export function relPathFrom(root: string, abs: string): string {
   return path.relative(root, abs).replace(/\\/g, "/");
 }

@@ -36,6 +36,7 @@ import {
   resolveBriefingBudget,
   serializeMemory,
   specificityScore,
+  adaptiveSemanticFloor,
   GUESSABLE_THRESHOLD,
   tokenizeQuery,
   trackReads,
@@ -164,10 +165,11 @@ export const GetBriefingInputSchema = {
     .max(1)
     .default(0)
     .describe(
-      "Drop semantic-only memory hits whose cosine score is below this threshold. " +
-      "Useful to avoid weakly-related noise when the task is short or the corpus is broad. " +
-      "Has no effect on memories matched via anchor/module/literal — those are always kept. " +
-      "Try 0.25–0.4 for stricter matching.",
+      "Floor for semantic-only memory hits (cosine). The default (0) is not 'keep everything': on a " +
+      "corpus large enough to characterize a distribution, an adaptive floor at the corpus mean+½σ is " +
+      "applied so the undifferentiated mass of weak hits is trimmed while the top hit is always kept. " +
+      "Set an explicit value to raise the bar further; it never lowers the adaptive one. " +
+      "Has no effect on memories matched via anchor/module/literal — those are always kept.",
     ),
   budget_preset: z
     .enum(["quick", "balanced", "deep"])
@@ -350,8 +352,11 @@ export async function getBriefing(
         }
       }
       if (semanticHits) {
+        // On a broad corpus, cosine scores compress and an absolute floor sorts nothing; raise the
+        // bar to the corpus distribution so the mass of near-identical weak hits is trimmed (§4.1).
+        const floor = adaptiveSemanticFloor(semanticHits.map((h) => h.score), input.min_semantic_score);
         for (const hit of semanticHits) {
-          if (hit.score < input.min_semantic_score && !seen.has(hit.id)) continue;
+          if (hit.score < floor && !seen.has(hit.id)) continue;
           const loaded = byId.get(hit.id);
           if (loaded) addOrUpdate(loaded, "semantic", hit.score, "semantic");
         }

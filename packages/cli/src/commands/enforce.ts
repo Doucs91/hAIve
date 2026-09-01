@@ -164,6 +164,9 @@ interface EnforcementReport {
   root: string;
   initialized: boolean;
   mode: "off" | "advisory" | "strict";
+  /** The hook/stage this report was built for — named in the pass line so two hooks firing on one
+   * `git` action (pre-commit then pre-push) read as distinct stages, not a duplicated print. */
+  stage?: "local" | "pre-commit" | "pre-push" | "ci";
   /** Who this run binds: "agent (…signals)" or "human — …". Absent for early-exit reports. */
   actor?: string;
   /** Effective gate posture and any explicit overrides — see `describePosture`. */
@@ -1327,6 +1330,7 @@ async function buildEnforcementReport(
       root,
       initialized,
       mode,
+      stage,
       score: buildScore([], config.enforcement?.scoreThreshold),
       should_block: false,
       findings: [{ severity: "info", code: "enforcement-off", message: "Hivelore enforcement is disabled." }],
@@ -1440,6 +1444,7 @@ async function buildEnforcementReport(
     root,
     initialized,
     mode,
+    stage,
     actor: verdict.actor,
     posture: describePosture(policy),
     score: computeBaselineHealth(effectiveFindings, policy.scoreThreshold),
@@ -3258,7 +3263,7 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
   // Verbose paths (CI, --explain) keep the whole report; `--verbose` (quiet=false) restores it too.
   if (quiet && !report.should_block && actionable.length === 0) {
     const ok = report.findings.filter((f) => f.severity === "ok").length;
-    ui.success(`Hivelore gate passed — ${ok} check(s), 0 issue(s).`);
+    ui.success(`Hivelore gate passed${stageLabel(report)} — ${ok} check(s), 0 issue(s).`);
     return;
   }
 
@@ -3295,8 +3300,14 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
     for (const finding of report.findings) printFinding(finding);
   }
   if (report.should_block) ui.error("Hivelore enforcement gate failed.");
-  else if (actionable.length > 0) ui.success(`Hivelore gate passed — ${actionable.length} advisory finding(s), 0 blocking.`);
-  else ui.success("Hivelore enforcement gate passed.");
+  else if (actionable.length > 0) ui.success(`Hivelore gate passed${stageLabel(report)} — ${actionable.length} advisory finding(s), 0 blocking.`);
+  else ui.success(`Hivelore enforcement gate passed${stageLabel(report)}.`);
+}
+
+/** Name the hook/stage in the pass line so pre-commit (then pre-push on the same push) don't read
+ * as one gate printed twice with mismatched counts (field report 2026-09-01 §4.4). */
+function stageLabel(report: EnforcementReport): string {
+  return report.stage && report.stage !== "local" ? ` (${report.stage})` : "";
 }
 
 function printFindingGroup(

@@ -6,6 +6,29 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.57.8] — A gate that names its stage, and a briefing floor that adapts
+
+Two more items from the 2026-09-01 field report: the gate that appeared to print twice (§4.4) and the
+semantic ranking that stopped discriminating on a broad corpus (§4.1).
+
+### The pass line names its stage
+
+- **`Hivelore gate passed (pre-commit)` / `(pre-push)`** (field report §4.4). One `git` action fires two
+  hooks — pre-commit then pre-push — each with its own check count. Unlabelled, the two lines read as a
+  single gate printed twice with mismatched numbers ("7 then 6"), and the report author could not tell
+  whether it was two hooks, two passes, or a display bug. The stage is now named, so the two lines are
+  self-explaining.
+
+### The briefing floor adapts to the corpus
+
+- **Semantic-only hits are floored at the corpus distribution, not an absolute cutoff** (field report
+  §4.1). On ~40 memories cosine scores compress into a narrow band (everything > 0.55), so an absolute
+  `min_semantic_score` of 0 sorted nothing and the same three or four unrelated memories surfaced at
+  ~0.6 for every task. The default now applies an adaptive floor at `mean + ½σ` of the hit
+  distribution: it trims the undifferentiated mass on a compressed distribution, always keeps the top
+  hit, never drops below an explicit caller floor, and does nothing below 12 samples so small corpora
+  (and the retrieval eval) are untouched. Retrieval recall held at 98% with no new misses.
+
 ## [0.57.7] — Stop the sensors punishing the docs that explain them
 
 A fourth field report (nine sessions, 40 memories, 16 sensors) found the sensor layer had crossed from
