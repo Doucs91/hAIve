@@ -5,7 +5,6 @@ import path from "node:path";
 import { Command, Option } from "commander";
 import {
   buildFrontmatter,
-  suggestSensorSeed,
   findProjectRoot,
   inferModulesFromPaths,
   loadConfig,
@@ -339,20 +338,11 @@ function printSensorLoopHint(
     );
     return;
   }
-  const seed = suggestSensorSeed(body, anchorPaths);
-  if (seed) {
-    ui.warn("Lesson NOT yet enforced — close the loop with a validated sensor via propose_sensor (MCP).");
-    ui.info(
-      `  candidate pattern=${JSON.stringify(seed.pattern)}` +
-      (seed.absent ? `  absent=${JSON.stringify(seed.absent)}` : "") +
-      "  — refine, then validate (silent on current code, fires on the bad example).",
-    );
-  } else {
-    ui.warn(
-      "Lesson NOT yet enforced and no candidate pattern could be derived from the wording. Author a " +
-      "discriminating sensor (pattern = faulty usage, absent = correct-usage marker) via propose_sensor.",
-    );
-  }
+  ui.warn(
+    "Lesson NOT yet enforced. Author a discriminating sensor (pattern = faulty usage, absent = " +
+    "correct-usage marker) via propose_sensor (MCP), or auto-derive one from the fix diff with " +
+    "`hivelore sensors propose --from-fix <ref>`.",
+  );
 }
 
 function normalizeBody(rawBody: string, title: string, titleExplicit: boolean): string {

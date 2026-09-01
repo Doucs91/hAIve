@@ -129,7 +129,7 @@ describe("Hivelore MCP tools", () => {
       expect(out.warning).toContain("validated without paths or symbols");
     });
 
-    it("does not persist a sensor for an anchored gotcha — reports loop_open + a seed for propose_sensor", async () => {
+    it("does not persist a sensor for an anchored gotcha — reports loop_open + routes to propose_sensor", async () => {
       const out = await memSave(
         {
           type: "gotcha",
@@ -142,9 +142,10 @@ describe("Hivelore MCP tools", () => {
         },
         ctx,
       );
-      // propose_sensor is now the sole writer of live sensors: mem_save offers a SEED, not a sensor.
+      // propose_sensor is the sole writer of live sensors: mem_save reports the open loop and points
+      // at propose_sensor / the diff miner — no prose-mined seed (it produced junk 7/7 in the field).
       expect(out.loop_open).toBe(true);
-      expect(out.proposed_sensor_seed?.pattern).toBe("BigInt");
+      expect(out.proposed_sensor_seed).toBeUndefined();
       expect(out.sensor_hint).toMatch(/propose_sensor/);
       const written = await readFile(out.file_path, "utf8");
       expect(written).not.toContain("sensor:");
@@ -170,7 +171,7 @@ describe("Hivelore MCP tools", () => {
   });
 
   describe("mem_tried", () => {
-    it("records an anchored attempt without a persisted sensor — loop_open + seed for propose_sensor", async () => {
+    it("records an anchored attempt without a persisted sensor — loop_open + routes to propose_sensor", async () => {
       const out = await memTried(
         {
           what: "Using BigInt in math",
@@ -184,7 +185,7 @@ describe("Hivelore MCP tools", () => {
       );
 
       expect(out.loop_open).toBe(true);
-      expect(out.proposed_sensor_seed?.pattern).toBe("BigInt");
+      expect(out.proposed_sensor_seed).toBeUndefined();
       const written = await readFile(out.file_path, "utf8");
       expect(written).toContain("type: attempt");
       expect(written).toContain("status: validated");

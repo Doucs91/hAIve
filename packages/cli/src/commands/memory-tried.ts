@@ -139,16 +139,7 @@ export function registerMemoryTried(memory: Command): void {
         return;
       }
 
-      if (result.proposed_sensor_seed) {
-        ui.warn("Lesson NOT yet enforced — close the loop with `--sensor-pattern` (one-shot) or propose_sensor (MCP).");
-        ui.info(
-          `  candidate pattern=${JSON.stringify(result.proposed_sensor_seed.pattern)}` +
-          (result.proposed_sensor_seed.absent ? `  absent=${JSON.stringify(result.proposed_sensor_seed.absent)}` : "") +
-          "  — refine, then validate (silent on current code, fires on the bad example).",
-        );
-      } else if (result.hint) {
-        ui.warn(result.hint);
-      }
+      if (result.hint) ui.warn(result.hint);
       // Behaviour bridge: when a regex can't express the mistake, route a real test instead.
       ui.info(`  Prefer a real test? \`hivelore sensors scaffold ${result.id}\` generates a pending test + the wiring command.`);
     });

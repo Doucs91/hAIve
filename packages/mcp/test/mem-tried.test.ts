@@ -38,9 +38,10 @@ describe("memTried — ratchet visibility", () => {
       },
       ctx,
     );
-    // The loop is OPEN until a sensor is validated via propose_sensor; no heuristic sensor is written.
+    // The loop is OPEN until a sensor is validated via propose_sensor; no heuristic sensor and no
+    // prose-mined seed (that produced junk 7/7 in the field) — the hint routes to propose_sensor.
     expect(out.loop_open).toBe(true);
-    expect(out.proposed_sensor_seed?.pattern).toMatch(/legacyClient|connect/);
+    expect(out.proposed_sensor_seed).toBeUndefined();
     expect(out.hint).toMatch(/propose_sensor/);
     const written = await readFile(out.file_path, "utf8");
     expect(written).not.toContain("sensor:");

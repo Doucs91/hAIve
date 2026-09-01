@@ -74,6 +74,9 @@ export function registerStats(program: Command): void {
           : opts.json
             ? JSON.stringify(receipt, null, 2)
             : renderPreventionReceipt(receipt);
+      // In --comment mode an empty body means "nothing worth posting" — stay silent so the CI step
+      // skips the PR comment entirely instead of posting a zero-count receipt on every PR.
+      if (sub.comment && output.trim() === "") return;
       console.log(output);
       // Behaviour-harness standing — a "where we are" footer for the human receipt (not the JSON /
       // share formats, which are structured/attribution surfaces). Best-effort: never break the receipt.

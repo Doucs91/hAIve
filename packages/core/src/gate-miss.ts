@@ -1,5 +1,4 @@
 import type { LoadedMemory } from "./loader.js";
-import { suggestSensorSeed } from "./sensor-suggest.js";
 import { proposeSeedsFromCommits, type GitCommit } from "./seed-git.js";
 import type { SensorEvaluation } from "./sensor-ledger.js";
 
@@ -108,15 +107,11 @@ export function proposeGateMissDrafts(
     const gateLine = gatePassed
       ? "\nThe gate PASSED this commit — a validated sensor here upgrades the harness.\n"
       : "";
-    // Seed from the commit subject ONLY. The body labels ("Subject:", "Reverted SHA:") and the
-    // generated why_failed sentence are boilerplate shared by every draft — token extraction on
-    // them produced the same junk pattern (/Subject\s*:/, "re-attempting") for every gate miss.
-    // A subject-derived hint is weak too, but at least it is about THIS change; when nothing
-    // distinctive survives, the honest "inspect the revert diff" fallback is used instead.
-    const candidate = suggestSensorSeed(seed.what, paths);
-    const sensorHint = candidate
-      ? `\nproposed_sensor_seed: ${JSON.stringify(candidate)}\n`
-      : "\nproposed_sensor_seed: inspect the revert diff, then author a deterministic candidate with `hivelore sensors propose <id>`.\n";
+    // No prose/subject-derived seed: it produced junk patterns in the field (report 2026-09-01 §5.1).
+    // The only trustworthy auto-source is the actual revert diff — point there instead of guessing.
+    const sensorHint =
+      "\nproposed_sensor_seed: inspect the revert diff, then author a deterministic candidate with " +
+      "`hivelore sensors propose --from-fix <revert-sha>` (it mines the fix diff and validates).\n";
     out.push({
       slug: `gate-miss-${failedSha.slice(0, 12)}`,
       reverted_sha: failedSha,

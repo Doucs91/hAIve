@@ -167,8 +167,14 @@ describe("prevention comment (§3.1: built by the CLI, not by jq inside YAML)", 
     events: [],
   };
 
-  it("says plainly when nothing fired", () => {
-    const body = renderPreventionComment(receipt, []);
+  it("suppresses the comment entirely when nothing fired and the window is empty (§5.7)", () => {
+    // A zero-count receipt posted on every PR advertises a number the product works to keep at zero.
+    expect(renderPreventionComment(receipt, [])).toBe("");
+  });
+
+  it("still reports when nothing fired on THIS PR but the rolling window has activity", () => {
+    const active: PreventionReceipt = { ...receipt, total: 3 };
+    const body = renderPreventionComment(active, []);
     expect(body).toContain("<!-- haive:prevention-receipt -->");
     expect(body).toContain("No documented sensor fired on this PR.");
   });

@@ -14,6 +14,11 @@ import { globToRegExp, isGlobPath } from "./relevance.js";
  */
 export function sensorPatternBrittleness(pattern: string): string | null {
   const literal = pattern
+    // A number used as a divisor/multiplier is a real constant — a decimal base, a byte size — not a
+    // line number. The operator must be a LITERAL `/`, an escaped `\*`/`\/`, or a `[/*]` char class
+    // (how a sensor writes "÷ or ×"); a bare `*`/`+` is a regex quantifier, never arithmetic. Strip it
+    // so a legitimate currency/units sensor is not forced into an approximate pattern (report §5.3).
+    .replace(/(?:\/|%|\\[/*]|\[[^\]]*[/*][^\]]*\])[^\d]{0,4}\d{3,}/g, " ")
     // Regex escapes (\d \w \s \b …) are structural, not literal digits — their letter is not a value.
     .replace(/\\[a-zA-Z]/g, " ")
     // Character classes and quantifiers generalize.

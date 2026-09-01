@@ -6,6 +6,49 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.58.0] — Stop the noise: no junk seeds, no zero-count receipts, quieter gate, leaner recap
+
+Acts on the "remove / transform" backlog from the 2026-09-01 field report (§5, §7). The theme is
+subtraction: every item here removes output that was noise, keeping the signal that earns trust.
+
+### Sensor seeds: no more prose-mined patterns (§5.1)
+
+- **`mem_save` / `mem_tried` no longer pre-fill a `proposed_sensor_seed`.** The prose miner produced
+  unusable patterns 7 times out of 7 in the field, and a visibly wrong first suggestion teaches agents
+  to stop reading the sensor loop — the most valuable thing Hivelore does. The tools now report the
+  open loop and route to `propose_sensor` (which validates) or to `hivelore sensors propose --from-fix
+  <ref>`, which mines the ACTUAL fix diff — the only trustworthy auto-source, and it is kept. The
+  gate-miss draft points at the revert diff instead of guessing from the commit subject.
+
+### The prevention receipt stops advertising zero (§5.7)
+
+- **No PR comment when nothing fired and the window is empty.** The pre-commit gate blocks locally, so
+  by design almost nothing reaches review — yet the receipt posted "No documented sensor fired · Weekly
+  total: 0" on every PR, including docs-only ones. `renderPreventionComment` now returns empty in that
+  case and the CI workflow skips the comment. When a sensor actually fires, or the rolling window has
+  activity, the receipt posts as before.
+
+### A quieter interactive gate (§5.4)
+
+- **`enforcement-score-below-threshold` and `decision-coverage-missing` no longer print on interactive
+  runs.** They describe the repo's standing baseline, not the change being committed, and were the two
+  most frequent, least actionable nags. They stay in the report for `doctor`, CI, and `--explain`, and
+  they never blocked. The `/100` currency-divisor case below also stops being mislabelled.
+
+### Must-read recaps stop costing 3000 tokens per briefing (§5.6)
+
+- **The briefing head carries only the recap's goal + next steps**, not the whole goal/accomplished/
+  discoveries/next-steps wall. A session with five briefings paid five times to re-read a recap the
+  agent had just written. The full recap stays in the corpus, reachable with `mem_get <id>`.
+
+### A narrower brittleness heuristic (§5.3)
+
+- **A `/100` divisor is no longer flagged as a hardcoded line number.** The heuristic that keeps
+  brittle line-number patterns out of block sensors mistook the decimal base of a minor-currency
+  conversion for a line number, forcing the author to widen an exact pattern into an approximate one
+  (`1[0-9]{2}`, which also accepts `/137`). A number preceded by a literal `/`, an escaped `\*`/`\/`,
+  or a `[/*]` char class is now recognised as arithmetic; a bare quantifier `*` is not.
+
 ## [0.57.8] — A gate that names its stage, and a briefing floor that adapts
 
 Two more items from the 2026-09-01 field report: the gate that appeared to print twice (§4.4) and the

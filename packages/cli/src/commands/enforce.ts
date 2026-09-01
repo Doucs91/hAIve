@@ -3165,6 +3165,8 @@ jobs:
           if [ -z "\${GH_TOKEN:-}" ] || ! command -v gh >/dev/null 2>&1; then exit 0; fi
           hivelore stats receipt --since 7d --comment --gate "$RUNNER_TEMP/hivelore-gate.json" \\
             > "$RUNNER_TEMP/hivelore-receipt.md" || exit 0
+          # Nothing fired and nothing in the rolling window → empty body → do not post a zero-count receipt.
+          [ -s "$RUNNER_TEMP/hivelore-receipt.md" ] || exit 0
           comments="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq \\
             '.[] | select(.body | contains("<!-- haive:prevention-receipt -->")) | .id' 2>/dev/null | head -1)"
           if [ -n "$comments" ]; then
@@ -3251,17 +3253,29 @@ function printBlockHeadline(report: EnforcementReport): void {
   }
 }
 
+/** Codes that describe the repo's standing baseline rather than the change being committed. Kept in
+ * the report (doctor, CI, --explain) but hidden from the quiet interactive gate — they never block
+ * and were the most frequent non-actionable nags (field report 2026-09-01 §5.4). */
+const STANDING_STATE_CODES = new Set(["enforcement-score-below-threshold", "decision-coverage-missing"]);
+
 function printReport(report: EnforcementReport, json: boolean, explain = false, quiet = false): void {
   if (json) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
   const actionable = report.findings.filter((f) => f.severity === "error" || f.severity === "warn");
+  // Standing-state findings describe the repo's baseline, not the change being committed: baseline
+  // health and the decision-coverage ritual were the two most frequent, least actionable nags on
+  // interactive runs (field report 2026-09-01 §5.4). Keep them in the report for `doctor`, CI, and
+  // --explain, but drop them from the quiet interactive gate. They never block.
+  const changeActionable = quiet
+    ? actionable.filter((f) => !STANDING_STATE_CODES.has(f.code))
+    : actionable;
 
   // SILENCE ON SUCCESS: a passing gate with nothing to act on is one line, not a page of ✓. A full
   // report on every clean commit buries the day a real block appears — the signal that matters most.
   // Verbose paths (CI, --explain) keep the whole report; `--verbose` (quiet=false) restores it too.
-  if (quiet && !report.should_block && actionable.length === 0) {
+  if (quiet && !report.should_block && changeActionable.length === 0) {
     const ok = report.findings.filter((f) => f.severity === "ok").length;
     ui.success(`Hivelore gate passed${stageLabel(report)} — ${ok} check(s), 0 issue(s).`);
     return;
@@ -3294,13 +3308,14 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
       const isNamedRefusal =
         CONTENT_CATCH_CODES.has(finding.code) && (finding.memory_ids ?? []).some((id) => named.has(id));
       if (isNamedRefusal) continue;
+      if (STANDING_STATE_CODES.has(finding.code)) continue;
       printFinding(finding);
     }
   } else {
     for (const finding of report.findings) printFinding(finding);
   }
   if (report.should_block) ui.error("Hivelore enforcement gate failed.");
-  else if (actionable.length > 0) ui.success(`Hivelore gate passed${stageLabel(report)} — ${actionable.length} advisory finding(s), 0 blocking.`);
+  else if (changeActionable.length > 0) ui.success(`Hivelore gate passed${stageLabel(report)} — ${changeActionable.length} advisory finding(s), 0 blocking.`);
   else ui.success(`Hivelore enforcement gate passed${stageLabel(report)}.`);
 }
 

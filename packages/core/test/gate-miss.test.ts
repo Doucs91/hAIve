@@ -45,9 +45,10 @@ describe("gate miss watch", () => {
     expect(proposal.paths).toEqual(["src/refund.ts"]);
   });
 
-  it("derives the sensor seed from the commit subject only, never from body/why boilerplate", () => {
+  it("emits an honest diff-miner directive as the seed, never a prose/subject-derived pattern", () => {
     const proposal = proposeGateMissDrafts([revert], new Set(), new Set())[0]!;
     const seedLine = proposal.body.split("\n").find((l) => l.startsWith("proposed_sensor_seed:"))!;
+    expect(seedLine).toContain("sensors propose --from-fix");
     expect(seedLine).not.toMatch(/Subject\\?s?\*?:/);
     expect(seedLine).not.toContain("Reverted");
     expect(seedLine).not.toContain("re-attempting"); // the shared generated why_failed sentence

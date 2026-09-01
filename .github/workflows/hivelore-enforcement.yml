@@ -47,22 +47,16 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ -z "${GH_TOKEN:-}" ] || ! command -v gh >/dev/null 2>&1; then exit 0; fi
-          receipt="$(node packages/cli/dist/index.js stats receipt --since 7d --json 2>/dev/null)" || exit 0
-          gate="$(cat "$RUNNER_TEMP/hivelore-gate.json" 2>/dev/null)" || gate='{"findings":[]}'
-          body="$(jq -nr --arg marker '<!-- haive:prevention-receipt -->' --argjson receipt "$receipt" --argjson gate "$gate" '
-            $marker + "\n## Hivelore prevention receipt\n\n" +
-            (([$gate.findings[]? | select(.code == "sensor-block" or .code == "sensor-warn") |
-              "- **" + (.memory_ids[0] // "sensor") + "** — " + .message] | if length == 0 then
-              "No documented sensor fired on this PR." else "### Fired on this PR\n" + join("\n") end)) +
-            "\n\nWeekly total: **" + ($receipt.total|tostring) + "** refused; previous window: **" +
-            ($receipt.previous_total|tostring) + "**."
-          ')" || exit 0
+          node packages/cli/dist/index.js stats receipt --since 7d --comment \
+            --gate "$RUNNER_TEMP/hivelore-gate.json" > "$RUNNER_TEMP/hivelore-receipt.md" || exit 0
+          # Nothing fired and nothing in the rolling window → empty body → do not post a zero-count receipt.
+          [ -s "$RUNNER_TEMP/hivelore-receipt.md" ] || exit 0
           comments="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate 2>/dev/null)" || exit 0
           comment_id="$(printf '%s' "$comments" | jq -r '.[] | select(.body | contains("<!-- haive:prevention-receipt -->")) | .id' | head -1)"
           if [ -n "$comment_id" ]; then
-            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -f body="$body" >/dev/null 2>&1 || true
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$RUNNER_TEMP/hivelore-receipt.md" >/dev/null 2>&1 || true
           else
-            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null 2>&1 || true
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F body=@"$RUNNER_TEMP/hivelore-receipt.md" >/dev/null 2>&1 || true
           fi
 
       - name: Report enforcement result

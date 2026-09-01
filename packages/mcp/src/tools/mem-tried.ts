@@ -5,7 +5,6 @@ import {
   buildFrontmatter,
   memoryFilePath,
   serializeMemory,
-  suggestSensorSeed,
 } from "@hivelore/core";
 import { z } from "zod";
 import type { HaiveContext } from "../context.js";
@@ -186,28 +185,18 @@ export async function memTried(
   // A captured attempt only CLOSES the loop (gate blocks the repeat) once a sensor is VALIDATED via
   // propose_sensor. We no longer auto-write a heuristic warn sensor; instead we hand the agent a SEED
   // (when one can be derived) to pre-fill propose_sensor, and tell it the loop is open until then.
-  const seed = input.paths.length > 0 ? suggestSensorSeed(body, input.paths) : null;
+  // No prose-mined seed: it produced unusable patterns in the field (report 2026-09-01 §5.1).
+  // Route to propose_sensor (which validates) or the diff miner — the only trustworthy auto-source.
   const hint =
     input.paths.length === 0
       ? "No `paths` given, so this attempt is feedforward-only — it will be briefed but the gate cannot block the repeat. Re-run with `paths` set to the file(s) where the mistake lives, then call propose_sensor to close the loop."
-      : seed
-        ? "This attempt is NOT yet enforced. Call propose_sensor (or re-run mem_tried with the one-shot `sensor` parameter) to turn it into a reliable block — a candidate is pre-filled in proposed_sensor_seed (refine it: pattern = the faulty usage, absent = the correct-usage marker). Hivelore validates the proposal (silent on current code, fires on the bad example) before trusting it to block."
-        : "This attempt is NOT yet enforced and no candidate pattern could be derived from the wording. Call propose_sensor with a discriminating pattern (pattern = faulty usage, absent = correct-usage marker) to close the loop.";
+      : "This attempt is NOT yet enforced. Call propose_sensor with a discriminating pattern (pattern = the faulty usage, absent = the correct-usage marker) to turn it into a reliable block; Hivelore validates it (silent on current code, fires on the bad example) before trusting it. To auto-derive a candidate from the actual fix diff, run `hivelore sensors propose --from-fix <ref>`.";
 
   return {
     id: frontmatter.id,
     scope: frontmatter.scope,
     file_path: file,
     loop_open: true,
-    ...(seed
-      ? {
-          proposed_sensor_seed: {
-            pattern: seed.pattern,
-            ...(seed.absent ? { absent: seed.absent } : {}),
-            message: seed.message,
-          },
-        }
-      : {}),
     hint,
   };
 }

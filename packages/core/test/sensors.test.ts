@@ -36,6 +36,16 @@ describe("sensorPatternBrittleness", () => {
     expect(sensorPatternBrittleness("antiPatternGate\\s*[:=]\\s*['\"]off['\"]")).toBeNull();
   });
 
+  it("does NOT flag an arithmetic constant like a /100 divisor (field report 2026-09-01 §5.3)", () => {
+    // The `100` is the decimal base of a minor-currency conversion, not a line number. Before the
+    // fix the author was forced to replace it with the looser `1[0-9]{2}` (which also accepts /137).
+    expect(sensorPatternBrittleness("(priceCents|amountCents)\\s*[/*]\\s*100\\b")).toBeNull();
+    expect(sensorPatternBrittleness("amountCents\\s*/\\s*100")).toBeNull();
+    expect(sensorPatternBrittleness("bytes\\s*\\*\\s*1024")).toBeNull();
+    // A real hardcoded line number (no arithmetic operator before it) is still flagged.
+    expect(sensorPatternBrittleness("foo:\\s*1131")).toMatch(/numeric literal/);
+  });
+
   it("does NOT flag IP/port literals or regex escapes, and names the offending token when it does", () => {
     // Field report §4.1: `\d+` is a regex escape (not a line number) and `127\.0\.0\.1` is an IP —
     // neither should be read as a brittle numeric literal. This exact pattern was wrongly rejected.

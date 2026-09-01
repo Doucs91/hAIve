@@ -11,7 +11,7 @@ import {
   deriveConfidence,
   estimateTokens,
   evaluateSkillActivation,
-  compactAutoRecapBody,
+  recapBriefingExcerpt,
   extractActionsBriefBody,
   getUsage,
   inferModulesFromPaths,
@@ -226,9 +226,10 @@ export async function getBriefing(
         id: fm.id,
         scope: fm.scope,
         revision_count: fm.revision_count ?? 0,
-        // Auto-generated recaps are low-signal tool dumps — compact them so they inform without
-        // dominating the briefing head. Human/post_task recaps pass through unchanged.
-        body: compactAutoRecapBody(r.memory.body),
+        // The briefing head carries only what the next session must act on — goal + next steps.
+        // The full recap stays in the corpus, reachable with mem_get, instead of being re-emitted
+        // in full (~3000 tokens) at the top of every briefing (field report 2026-09-01 §5.6).
+        body: recapBriefingExcerpt(r.memory.body),
       };
     }
 

@@ -52,3 +52,29 @@ export function compactAutoRecapBody(body: string, maxChars = 600): string {
   const trimmed = discovery.length > maxChars ? discovery.slice(0, maxChars) + "…" : discovery;
   return `${header}\n\n**Discoveries:**\n${trimmed}`;
 }
+
+/**
+ * The excerpt of a recap that belongs at the TOP of every briefing: only what the next session must
+ * act on — the goal in one line and the next steps.
+ *
+ * A full human/post_task recap (goal + accomplished + discoveries + next steps) ran ~3000 tokens and
+ * was re-emitted at the head of EVERY briefing, so a session with five briefings paid five times to
+ * re-read a wall the agent had just written (field report 2026-09-01 §5.6). The full body stays in
+ * the corpus — reachable with `mem_get <id>` — this only trims what the briefing head carries. Auto
+ * recaps still route through {@link compactAutoRecapBody}. Pure.
+ */
+export function recapBriefingExcerpt(body: string, maxChars = 700): string {
+  if (isAutoRecap(body)) return compactAutoRecapBody(body);
+  const section = (name: RegExp): string =>
+    body.match(name)?.[1]?.trim() ?? "";
+  const goal = section(/##+\s*Goal[^\n]*\n+([\s\S]*?)(?=\n##+\s|\n*$)/i);
+  const next = section(/##+\s*Next steps?[^\n]*\n([\s\S]*?)(?=\n##+\s|\n*$)/i);
+  // A free-form recap with no structured sections is its own point — return it (bounded).
+  if (!goal && !next) return body.length > maxChars ? body.slice(0, maxChars).trimEnd() + "…" : body;
+  const parts: string[] = [];
+  if (goal) parts.push(`_${goal.split("\n")[0]!.trim()}_`);
+  parts.push(next ? `**Next steps:**\n${next}` : "_No next steps recorded — `mem_get <id>` for the full recap._");
+  let out = parts.join("\n\n");
+  if (out.length > maxChars) out = out.slice(0, maxChars).trimEnd() + "…";
+  return out;
+}

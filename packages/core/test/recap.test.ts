@@ -1,6 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { compactAutoRecapBody, isAutoRecap } from "../src/recap.js";
+import { compactAutoRecapBody, isAutoRecap, recapBriefingExcerpt } from "../src/recap.js";
 import { isEnvWorkaroundMemory } from "../src/relevance.js";
+
+describe("recapBriefingExcerpt (field report 2026-09-01 §5.6)", () => {
+  const human = [
+    "## Goal",
+    "Ship the Stripe currency refactor.",
+    "## Accomplished",
+    "- Reworked minor-unit handling across 12 files",
+    "- Wired the webhook signature check",
+    "## Discoveries",
+    "- Stripe stores amounts in minor units; a /100 was doubling the charge",
+    "## Next steps",
+    "- Backfill historical orders\n- Add a sensor for the /100 divisor",
+  ].join("\n");
+
+  it("keeps only the goal line and next steps — not the whole wall", () => {
+    const out = recapBriefingExcerpt(human);
+    expect(out).toContain("Ship the Stripe currency refactor.");
+    expect(out).toContain("Next steps:");
+    expect(out).toContain("Backfill historical orders");
+    expect(out).not.toContain("Reworked minor-unit handling"); // accomplished dropped
+    expect(out).not.toContain("doubling the charge"); // discoveries dropped
+    expect(out.length).toBeLessThan(human.length);
+  });
+
+  it("still routes auto recaps through the auto compactor", () => {
+    const auto = "## Goal\nAuto-captured session (168 tool calls)\n## Discoveries\nNo new memories saved this session.";
+    expect(recapBriefingExcerpt(auto)).toBe(compactAutoRecapBody(auto));
+  });
+
+  it("returns a bounded body for a free-form recap with no sections", () => {
+    expect(recapBriefingExcerpt("just some freeform prose")).toBe("just some freeform prose");
+  });
+});
 
 describe("recap compaction", () => {
   const auto = [

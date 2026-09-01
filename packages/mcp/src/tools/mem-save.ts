@@ -8,7 +8,6 @@ import {
   loadMemoriesFromDir,
   memoryFilePath,
   serializeMemory,
-  suggestSensorSeed,
   type Sensor,
 } from "@hivelore/core";
 import { z } from "zod";
@@ -138,28 +137,16 @@ function sensorLoopState(
         "propose_sensor to close the loop.",
     };
   }
-  const seed = suggestSensorSeed(body, paths);
-  if (seed) {
-    return {
-      loop_open: true,
-      proposed_sensor_seed: {
-        pattern: seed.pattern,
-        ...(seed.absent ? { absent: seed.absent } : {}),
-        message: seed.message,
-      },
-      sensor_hint:
-        "This lesson is NOT yet enforced. Call propose_sensor to turn it into a reliable block — a " +
-        "candidate is pre-filled in proposed_sensor_seed (refine it: pattern = the faulty usage, " +
-        "absent = the correct-usage marker). Hivelore validates the proposal (silent on current code, " +
-        "fires on the bad example) before trusting it to block.",
-    };
-  }
+  // The prose-mined seed produced unusable patterns 7/7 in the field (report 2026-09-01 §5.1); a
+  // wrong seed teaches agents to stop reading the loop. No seed beats a wrong one — point at
+  // propose_sensor (which validates) and at the diff miner, the only trustworthy auto-source.
   return {
     loop_open: true,
     sensor_hint:
-      "This lesson is NOT yet enforced and no candidate pattern could be derived from the wording. Call " +
-      "propose_sensor with a discriminating pattern (pattern = faulty usage, absent = correct-usage " +
-      "marker) to close the loop.",
+      "This lesson is NOT yet enforced. Close the loop by calling propose_sensor with a discriminating " +
+      "pattern (pattern = the faulty usage, absent = the correct-usage marker); Hivelore validates it " +
+      "(silent on current code, fires on the bad example) before trusting it to block. To auto-derive a " +
+      "candidate from the actual fix diff, run `hivelore sensors propose --from-fix <ref>`.",
   };
 }
 

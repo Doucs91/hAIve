@@ -308,6 +308,10 @@ export function renderPreventionComment(
   findings: PreventionCommentFinding[] = [],
 ): string {
   const fired = findings.filter((f) => f.code === "sensor-block" || f.code === "sensor-warn");
+  // Nothing fired on this PR and nothing in the rolling window: the comment would be pure noise
+  // ("No documented sensor fired" + "Weekly total: 0") posted on every PR, advertising a count the
+  // product works to keep at zero (field report 2026-09-01 §5.7). Say nothing — the caller skips it.
+  if (fired.length === 0 && receipt.total === 0) return "";
   const lines = [PREVENTION_RECEIPT_MARKER, "", "## Hivelore prevention receipt", ""];
   if (fired.length === 0) {
     lines.push("No documented sensor fired on this PR.", "");
