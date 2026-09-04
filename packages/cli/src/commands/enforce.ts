@@ -25,7 +25,7 @@ import {
   detectAgentContext,
   loadMemoriesFromDir,
   loadMemoriesFromDirDetailed,
-  classifyNpmPublication,
+  classifyLockstepPublication,
   classifyGithubRelease,
   compareVersions,
   buildBaselineHealthFinding,
@@ -902,19 +902,28 @@ async function verifyNpmPublication(
 ): Promise<EnforcementFinding[]> {
   if (config.enforcement?.npmPublishCheck === "off") return [];
 
-  const packageName = await primaryPublishablePackage(root);
-  if (!packageName) return []; // nothing is published from here — stay silent rather than add noise
+  // EVERY lockstep package, not a representative one. Publication is per-package, so the set can
+  // land partially — and a partial set is the state that actually breaks installs (see
+  // classifyLockstepPublication). Asking only the first publishable manifest made 0.60.0 report
+  // "publish is the next step" about core while @hivelore/mcp was missing and the CLI uninstallable.
+  const packageNames = await publishablePackageNames(root);
+  if (packageNames.length === 0) return []; // nothing is published from here — stay silent rather than add noise
 
-  const published = await runCommand("npm", ["view", packageName, "version"], root)
-    .then((out) => out.trim())
-    .catch(() => null);
-  const publishedVersion = published && /^\d/.test(published) ? published : null;
+  const packages = await Promise.all(packageNames.map(async (packageName) => {
+    const published = await runCommand("npm", ["view", packageName, "version"], root)
+      .then((out) => out.trim())
+      .catch(() => null);
+    const publishedVersion = published && /^\d/.test(published) ? published : null;
+    return {
+      packageName,
+      publishedVersion,
+      taggedBetween: publishedVersion ? await taggedVersionsBetween(root, publishedVersion, version) : [],
+    };
+  }));
 
-  const verdict = classifyNpmPublication({
-    packageName,
+  const verdict = classifyLockstepPublication({
     localVersion: version,
-    publishedVersion,
-    taggedBetween: publishedVersion ? await taggedVersionsBetween(root, publishedVersion, version) : [],
+    packages,
     publishHint: `\`gh workflow run release -f tag=v${version}\` or \`pnpm run publish:all\``,
   });
   return [{
@@ -997,19 +1006,23 @@ async function versionTags(root: string): Promise<string[]> {
 }
 
 /**
- * The package whose registry version stands for the release. Derived from the files that already
- * carry the lockstep version rather than hardcoded, so this works outside this repo: the first
- * non-private one with a name wins, and a single-package repo resolves to its root package.json.
+ * Every package this repo publishes at the lockstep version. Derived from the files that already
+ * carry that version rather than hardcoded, so this works outside this repo: private manifests are
+ * skipped (a private root package.json contributes nothing), and a single-package repo resolves to
+ * the one name. Order follows VERSION_FILES, which is stable, so the report reads the same each run.
  */
-async function primaryPublishablePackage(root: string): Promise<string | null> {
+async function publishablePackageNames(root: string): Promise<string[]> {
+  const names: string[] = [];
   for (const file of VERSION_FILES) {
     const manifest = await readFile(path.join(root, file), "utf8")
       .then((raw) => JSON.parse(raw) as { name?: unknown; private?: unknown })
       .catch(() => null);
     if (!manifest || manifest.private === true) continue;
-    if (typeof manifest.name === "string" && manifest.name.length > 0) return manifest.name;
+    if (typeof manifest.name === "string" && manifest.name.length > 0 && !names.includes(manifest.name)) {
+      names.push(manifest.name);
+    }
   }
-  return null;
+  return names;
 }
 
 /** Version tags strictly between what npm has and what HEAD carries — the ones that were skipped. */

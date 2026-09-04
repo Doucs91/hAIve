@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyNpmPublication } from "../src/index.js";
+import { classifyLockstepPublication, classifyNpmPublication } from "../src/index.js";
 
 const base = { packageName: "@hivelore/cli", localVersion: "0.57.2", taggedBetween: [] as string[] };
 
@@ -58,5 +58,78 @@ describe("classifyNpmPublication", () => {
       const v = classifyNpmPublication({ ...base, publishedVersion: published, taggedBetween: ["0.57.0"] });
       expect(["ok", "info", "warn"]).toContain(v.severity);
     }
+  });
+});
+
+describe("classifyLockstepPublication", () => {
+  const lockstep = (published: Record<string, string | null>, taggedBetween: string[] = []) => ({
+    localVersion: "0.60.0",
+    packages: Object.entries(published).map(([packageName, publishedVersion]) => ({
+      packageName,
+      publishedVersion,
+      taggedBetween,
+    })),
+  });
+
+  it("warns on a PARTIAL publish — the state that actually breaks installs", () => {
+    // The real 0.60.0 incident: core/cli/embeddings shipped, @hivelore/mcp did not. Because cli pins
+    // its siblings exactly, `npm i -g @hivelore/cli` failed for everyone with ETARGET, while the
+    // single-package check reported a bland "publish is the next step" about core.
+    const v = classifyLockstepPublication(lockstep({
+      "@hivelore/core": "0.60.0",
+      "@hivelore/cli": "0.60.0",
+      "@hivelore/embeddings": "0.60.0",
+      "@hivelore/mcp": "0.59.0",
+    }));
+    expect(v.code).toBe("npm-publication-incoherent");
+    expect(v.severity).toBe("warn");
+    expect(v.message).toContain("@hivelore/mcp (0.59.0)");
+    expect(v.message).not.toContain("@hivelore/core (");
+    expect(v.fix).toContain("credentials");
+  });
+
+  it("stays informational when NOTHING is published yet — the normal state at finish time", () => {
+    const v = classifyLockstepPublication(lockstep({
+      "@hivelore/core": "0.59.0",
+      "@hivelore/mcp": "0.59.0",
+    }));
+    expect(v.code).toBe("npm-publish-pending");
+    expect(v.severity).toBe("info");
+  });
+
+  it("is ok once every package reached the lockstep version", () => {
+    const v = classifyLockstepPublication(lockstep({
+      "@hivelore/core": "0.60.0",
+      "@hivelore/mcp": "0.60.0",
+    }));
+    expect(v.code).toBe("npm-published");
+    expect(v.severity).toBe("ok");
+  });
+
+  it("treats a package published AHEAD of the local version as satisfied", () => {
+    const v = classifyLockstepPublication(lockstep({
+      "@hivelore/core": "0.61.0",
+      "@hivelore/mcp": "0.60.0",
+    }));
+    expect(v.code).toBe("npm-published");
+  });
+
+  it("still reports tagged releases the registry skipped entirely", () => {
+    const v = classifyLockstepPublication(lockstep(
+      { "@hivelore/core": "0.57.0", "@hivelore/mcp": "0.57.0" },
+      ["0.58.0", "0.59.0"],
+    ));
+    expect(v.code).toBe("npm-releases-skipped");
+    expect(v.severity).toBe("warn");
+    expect(v.message).toContain("v0.58.0");
+  });
+
+  it("reports an unreachable registry as unknown, and never returns an error severity", () => {
+    const v = classifyLockstepPublication(lockstep({ "@hivelore/core": null, "@hivelore/mcp": null }));
+    expect(v.code).toBe("npm-publication-unverified");
+    expect(v.severity).toBe("info");
+    // A package we could not reach must not be mistaken for one that is behind.
+    const partial = classifyLockstepPublication(lockstep({ "@hivelore/core": "0.60.0", "@hivelore/mcp": null }));
+    expect(partial.code).toBe("npm-published");
   });
 });

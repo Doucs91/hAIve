@@ -6,6 +6,22 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.60.1] — `finish` checks the whole lockstep set, not one package
+
+- **`enforce finish` now verifies every publishable package against the registry.** It asked about
+  one representative package, which assumes publication is atomic. It is not: `publish:all` runs one
+  `pnpm publish` per package, so any of them can fail alone (expired OTP, 403) while the others land.
+  That produces a PARTIAL publish — a registry set that cannot install itself — and nothing watched
+  for it. On 0.60.0, core/cli/embeddings shipped and `@hivelore/mcp` did not; since cli pins its
+  siblings exactly, every `npm i -g @hivelore/cli` failed with
+  `ETARGET  No matching version found for @hivelore/mcp@0.60.0`, while `finish` reported a bland
+  "publish is the next step" about core and said nothing about the break.
+- **New `npm-publication-incoherent` verdict (warn).** The severity split is preserved: nothing
+  published yet stays informational (the normal state at `finish` time, before publishing), a tagged
+  version the registry skipped stays a warning, and a partially-published set is now a warning too —
+  because dependents are broken at that moment. A package the registry could not be reached for is
+  never counted as behind.
+
 ## [0.60.0] — Scope, exceptions, and a gate you can actually pass
 
 Continues the 2026-09-02 and 2026-09-04 field reports where 0.59.0 stopped. That release fixed what
