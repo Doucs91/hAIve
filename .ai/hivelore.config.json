@@ -33,7 +33,6 @@
     "humanCommits": "relaxed",
     "commandSensorUnrunnable": "block",
     "sensorWeakeningGate": "block",
-    "scoreThreshold": 85,
     "cleanupGeneratedArtifacts": true,
     "toolProfile": "enforcement",
     "policyPacks": [

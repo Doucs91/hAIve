@@ -360,9 +360,8 @@ left broken by an old install, `hivelore doctor --fix` regenerates it.
       import moment from 'moment';
 ```
 
-One lesson, one line, with the file and the offending source. No composite score: the repo's
-`knowledge-layer health` percentage is a measurement of your baseline, reported but never a verdict
-on your change.
+One lesson, one line, with the file and the offending source. No composite score of any kind: the
+gate reports what refused the change and what to do about it, and stays silent otherwise.
 
 ---
 

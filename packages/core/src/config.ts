@@ -336,8 +336,6 @@ export interface HaiveConfig {
      * Default: 180.
      */
     decayAfterDays?: number;
-    /** Minimum score required for strict enforcement gates. */
-    scoreThreshold?: number;
     /** Remove generated Hivelore runtime/cache files during cleanup gates. */
     cleanupGeneratedArtifacts?: boolean;
     /**
@@ -402,7 +400,6 @@ export const DEFAULT_CONFIG: HaiveConfig = {
     humanCommits: "relaxed",
     commandSensorUnrunnable: "warn",
     sensorWeakeningGate: "warn",
-    scoreThreshold: 80,
     cleanupGeneratedArtifacts: true,
     toolProfile: "enforcement",
     policyPacks: ["architecture", "gotchas", "security", "domain", "release"],
@@ -439,7 +436,6 @@ export const AUTOPILOT_DEFAULTS: HaiveConfig = {
     humanCommits: "relaxed",
     commandSensorUnrunnable: "warn",
     sensorWeakeningGate: "warn",
-    scoreThreshold: 85,
     cleanupGeneratedArtifacts: true,
     toolProfile: "enforcement",
     policyPacks: ["architecture", "gotchas", "security", "domain", "release"],

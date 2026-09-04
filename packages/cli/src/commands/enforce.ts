@@ -28,8 +28,6 @@ import {
   classifyLockstepPublication,
   classifyGithubRelease,
   compareVersions,
-  buildBaselineHealthFinding,
-  computeBaselineHealth,
   decideVerdict,
   dedupeRefusals,
   describePosture,
@@ -60,7 +58,7 @@ import {
   type LoadedMemory,
   type HaiveConfig,
 } from "@hivelore/core";
-import type { GateFinding, BaselineHealth } from "@hivelore/core";
+import type { GateFinding } from "@hivelore/core";
 import { astEngineAvailable, getBriefing, preCommitCheck, runAstSensorOnContent } from "@hivelore/mcp";
 import { ui } from "../utils/ui.js";
 import { installClaudeHooksAtPath, uninstallClaudeHooksAtPath, defaultClaudeSettingsPath } from "../utils/claude-hooks.js";
@@ -158,7 +156,6 @@ interface FinishOptions {
  * logic that consumes it; aliased here so the command file reads the same as before.
  */
 type EnforcementFinding = GateFinding;
-type EnforcementScore = BaselineHealth;
 
 interface EnforcementReport {
   root: string;
@@ -171,7 +168,6 @@ interface EnforcementReport {
   actor?: string;
   /** Effective gate posture and any explicit overrides — see `describePosture`. */
   posture?: string;
-  score: EnforcementScore;
   should_block: boolean;
   findings: EnforcementFinding[];
   categories: {
@@ -245,7 +241,6 @@ export function registerEnforce(program: Command): void {
           requireMemoryVerify: true,
           blockStaleDecisionChanges: true,
           requireDecisionCoverage: true,
-          scoreThreshold: 85,
           cleanupGeneratedArtifacts: true,
           toolProfile: "enforcement",
           policyPacks: ["architecture", "gotchas", "security", "domain", "release"],
@@ -632,7 +627,6 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
       root,
       initialized,
       mode,
-      score: buildScore([], config.enforcement?.scoreThreshold),
       should_block: true,
       findings: [{
         severity: "error",
@@ -1110,13 +1104,11 @@ function finishReport(
   findings: EnforcementFinding[],
   config: HaiveConfig,
 ): EnforcementReport {
-  const score = buildScore(findings, config.enforcement?.scoreThreshold);
   const hasErrors = findings.some((f) => f.severity === "error");
   return withCategories({
     root,
     initialized,
     mode,
-    score,
     should_block: mode === "strict" && hasErrors,
     findings,
   });
@@ -1354,7 +1346,6 @@ async function buildEnforcementReport(
       root,
       initialized,
       mode,
-      score: buildScore([], config.enforcement?.scoreThreshold),
       should_block: true,
       findings: [{
         severity: "error",
@@ -1372,7 +1363,6 @@ async function buildEnforcementReport(
       initialized,
       mode,
       stage,
-      score: buildScore([], config.enforcement?.scoreThreshold),
       should_block: false,
       findings: [{ severity: "info", code: "enforcement-off", message: "Hivelore enforcement is disabled." }],
     });
@@ -1470,12 +1460,6 @@ async function buildEnforcementReport(
     agentSignals: agentContext.signals,
   });
   let effectiveFindings = verdict.findings;
-  const healthFinding = buildBaselineHealthFinding(
-    effectiveFindings,
-    verdict.baseline_health,
-    verdict.should_block,
-  );
-  if (healthFinding) effectiveFindings = [...effectiveFindings, healthFinding];
 
   // Collapse an advisory reminder that has already been shown in full today. The finding, its
   // severity and its fix are untouched — only how much of it a human sees again.
@@ -1488,7 +1472,6 @@ async function buildEnforcementReport(
     stage,
     actor: verdict.actor,
     posture: describePosture(policy),
-    score: computeBaselineHealth(effectiveFindings, policy.scoreThreshold),
     should_block: verdict.should_block,
     findings: effectiveFindings,
   });
@@ -3106,10 +3089,6 @@ async function collapseRepeatedReminders(
  * The real computation lives in `core/gate-verdict.ts` so there is exactly one definition of the
  * number and it cannot drift between the two call paths.
  */
-function buildScore(findings: EnforcementFinding[], threshold = 80): EnforcementScore {
-  return computeBaselineHealth(findings, threshold);
-}
-
 /** The managed git hooks Hivelore owns, as `{ name, body }` — the single source of truth reused by
  *  install AND the doctor self-heal path, so they can never drift apart. */
 export function managedGitHookSpecs(): Array<{ name: string; body: string }> {
@@ -3370,7 +3349,6 @@ function printBlockHeadline(report: EnforcementReport): void {
  * and were the most frequent non-actionable nags (field reports 2026-09-01 §5.4, 2026-09-02 §3.4:
  * the same two process warnings printed on all ~20 commits of a session). */
 const STANDING_STATE_CODES = new Set([
-  "enforcement-score-below-threshold",
   "decision-coverage-missing",
   "briefing-missing",
   "bootstrap-incomplete",
@@ -3401,9 +3379,6 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
 
   console.log(ui.bold(`Hivelore enforcement — ${report.mode}${report.actor ? ` · ${report.actor}` : ""}`));
   console.log(ui.dim(`  root: ${report.root}`));
-  // Name what the number measures. "score: 40%" invited the reading "your change is 40% good";
-  // it has only ever described the repo's standing knowledge layer.
-  console.log(ui.dim(`  knowledge-layer health: ${report.score.score}% (target ${report.score.threshold}%)`));
   if (explain && report.posture) console.log(ui.dim(`  posture: ${report.posture}`));
 
   if (report.should_block) printBlockHeadline(report);
@@ -3457,11 +3432,7 @@ function printFindingGroup(
   console.log();
   const heading = tone === "error" ? ui.red(title) : tone === "warn" ? ui.yellow(title) : ui.bold(title);
   console.log(ui.bold(`${heading} (${findings.length})`));
-  const scoreFinding = findings.find((f) => f.code === "enforcement-score-below-threshold");
-  for (const finding of findings.filter((f) => f.code !== "enforcement-score-below-threshold")) {
-    printFinding(finding, true);
-  }
-  if (scoreFinding) printFinding(scoreFinding, true);
+  for (const finding of findings) printFinding(finding, true);
 }
 
 function printFinding(finding: EnforcementFinding, explain = false): void {

@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildBaselineHealthFinding,
-  computeBaselineHealth,
   decideVerdict,
   dedupeRefusals,
   describePosture,
@@ -163,32 +161,20 @@ describe("one lesson is reported once", () => {
   });
 });
 
-describe("baseline health measures the repo, not the change", () => {
-  it("a block sensor does not move it — that is a verdict, not a health signal", () => {
-    const clean = computeBaselineHealth([{ severity: "ok", code: "x", message: "" }], 80);
-    const withSensor = computeBaselineHealth(
-      [{ severity: "ok", code: "x", message: "" }, sensorBlock("m1")],
-      80,
-    );
-    expect(withSensor.score).toBe(clean.score);
-  });
-
-  it("a cold knowledge layer does move it", () => {
-    expect(computeBaselineHealth([processFinding("briefing-missing", 35)], 80).score).toBe(65);
-  });
-
-  it("is never emitted as a finding when something already refused", () => {
-    const findings = [sensorBlock("m1"), processFinding("briefing-missing")];
-    const health = computeBaselineHealth(findings, 80);
-    expect(buildBaselineHealthFinding(findings, health, true)).toBeNull();
-  });
-
-  it("when emitted, it is a warning that names the gaps and says it does not block", () => {
-    const findings = [{ ...processFinding("briefing-missing", 35), severity: "warn" as const }];
-    const health = computeBaselineHealth(findings, 80);
-    const finding = buildBaselineHealthFinding(findings, health, false)!;
-    expect(finding.severity).toBe("warn");
-    expect(finding.message).toContain("briefing-missing");
-    expect(finding.message).toContain("never blocks");
+describe("the knowledge-layer health score is gone", () => {
+  it("is not reported in the verdict at all", () => {
+    // Removed in 0.61.0. It read `100 − Σ penalties of this invocation`, so an empty repo with no
+    // corpus scored 100% while a repo with 44 memories and one uncommitted file scored 0%. Three
+    // field reports asked for it: it moved without a visible cause, nobody could raise it, and it
+    // never blocked. A number whose name says "knowledge layer" while it measures git hygiene
+    // cannot be acted on, so it is not worth the line it printed on.
+    const verdict = decideVerdict({
+      findings: [processFinding("briefing-missing")],
+      policy: resolveGatePolicy({}),
+      stage: "pre-push",
+      isAgent: true,
+    });
+    expect(verdict).not.toHaveProperty("baseline_health");
+    expect(verdict.findings.some((f) => f.code === "enforcement-score-below-threshold")).toBe(false);
   });
 });

@@ -6,6 +6,38 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.61.0] — Remove the knowledge-layer health score
+
+Asked for by three consecutive field reports (2026-09-01, 09-02 §3.5, 09-04 §6), each saying the same
+three things: it moved without a visible cause, nobody knew how to raise it, and it never blocked.
+
+Reading what it computed explains all three. It was `100 − Σ penalties of the findings this
+invocation produced`, with content catches excluded — so:
+
+- an empty repo with no corpus at all scored **100%**, the maximum;
+- a repo with 44 memories and 16 sensors scored **0%** as soon as one `error` finding with impact 100
+  fired — an uncommitted file, a red CI. That is the reported "0% with a full corpus": not a bug, the
+  formula;
+- the observed "95% then 87%, unchanged corpus" was exactly `100 − 8 (briefing-missing) − 5
+  (bootstrap-incomplete)`, the first appearing and disappearing with the freshness of a local marker;
+- a block sensor catching a real mistake — the knowledge layer doing its job — moved it by zero
+  points, being classified as a content catch.
+
+It measured how many complaints an invocation produced, and called that the health of the knowledge
+layer. A number whose name designates something other than what it measures cannot be acted on.
+
+### Removed
+
+- The `knowledge-layer health: N% (target M%)` line from every `enforce` stage.
+- The `enforcement-score-below-threshold` finding (already hidden from the interactive gate in
+  0.58.0 — which was the admission that it was not useful).
+- `enforcement.scoreThreshold` from the config schema and both posture defaults.
+- `score` from the `enforce --json` report, and `baseline_health` from the core gate verdict.
+- `computeBaselineHealth`, `buildBaselineHealthFinding` and the `BaselineHealth` type from
+  `@hivelore/core`.
+
+Nothing else changes: what refused a change, and why, is reported exactly as before.
+
 ## [0.60.1] — `finish` checks the whole lockstep set, not one package
 
 - **`enforce finish` now verifies every publishable package against the registry.** It asked about

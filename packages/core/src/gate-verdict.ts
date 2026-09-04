@@ -56,12 +56,9 @@ export const PROCESS_GATE_CODES = new Set([
 export const CONTENT_CATCH_CODES = new Set(["sensor-block", "precommit-policy-block"]);
 
 /** Every code that describes the diff rather than the repo's standing state. */
-const CONTENT_CODES = new Set([...CONTENT_CATCH_CODES, "sensor-warn"]);
-
 /** Setup/baseline gates — about the repo's knowledge layer being cold, not the change just made. */
 export const SETUP_GATE_CODES = new Set([
   ...PROCESS_GATE_CODES,
-  "enforcement-score-below-threshold",
 ]);
 
 // ── Posture ──────────────────────────────────────────────────────────────────
@@ -80,7 +77,6 @@ export interface GatePolicyInput {
   mode?: "off" | "advisory" | "strict";
   processGate?: "warn" | "block";
   humanCommits?: "relaxed" | "strict";
-  scoreThreshold?: number;
 }
 
 export interface GatePolicy {
@@ -88,12 +84,11 @@ export interface GatePolicy {
   mode: "off" | "advisory" | "strict";
   processGate: "warn" | "block";
   humanCommits: "relaxed" | "strict";
-  scoreThreshold: number;
   /** Which fields the user pinned explicitly, so `doctor` can show posture vs. override. */
   overrides: string[];
 }
 
-const POSTURE_DEFAULTS: Record<GatePosture, Omit<GatePolicy, "posture" | "overrides" | "scoreThreshold">> = {
+const POSTURE_DEFAULTS: Record<GatePosture, Omit<GatePolicy, "posture" | "overrides">> = {
   // Report everything, refuse nothing. For adopting Hivelore on a repo mid-flight.
   advisory: { mode: "advisory", processGate: "warn", humanCommits: "relaxed" },
   // Refuse on deterministic, code-bound evidence only. The default.
@@ -115,7 +110,6 @@ export function resolveGatePolicy(input: GatePolicyInput | undefined): GatePolic
     mode: cfg.mode ?? base.mode,
     processGate: cfg.processGate ?? base.processGate,
     humanCommits: cfg.humanCommits ?? base.humanCommits,
-    scoreThreshold: cfg.scoreThreshold ?? 80,
     overrides,
   };
 }
@@ -144,22 +138,10 @@ export interface GateVerdictInput {
   agentSignals?: string[];
 }
 
-export interface BaselineHealth {
-  /**
-   * Health of the repo's KNOWLEDGE LAYER, 0–100. Deliberately not a verdict on the change: content
-   * catches are excluded, because a number that moves both when the repo is cold and when this
-   * particular diff repeated a lesson cannot be tracked over time — it never means one thing.
-   */
-  score: number;
-  threshold: number;
-  checks: { total: number; ok: number; warn: number; error: number };
-}
-
 export interface GateVerdict {
   findings: GateFinding[];
   should_block: boolean;
   actor: string;
-  baseline_health: BaselineHealth;
   /** Content catches that refuse this change, one entry per memory (never the same lesson twice). */
   refusals: GateFinding[];
   /** Why process gates did or did not bind on this run. */
@@ -210,36 +192,6 @@ function processGateDecision(
   return { refuses: true, reason: "enforced: process gates bind at this sharing point." };
 }
 
-/** Penalty a finding contributes, using the same defaults the gate has always used. */
-function penaltyOf(finding: GateFinding): number {
-  if (finding.severity === "error") return finding.impact ?? 25;
-  if (finding.severity === "warn") return finding.impact ?? 8;
-  return 0;
-}
-
-/**
- * Baseline health, computed from the repo's STANDING STATE only.
- *
- * Content catches are excluded on purpose. They are a verdict about one diff; folding them into a
- * health percentage meant the number dropped because of a change under review and rose again when
- * that change was fixed, while also encoding "the corpus is cold". One number, two meanings, and so
- * no meaning at all — nobody could act on a trend in it.
- */
-export function computeBaselineHealth(findings: GateFinding[], threshold: number): BaselineHealth {
-  const baseline = findings.filter((f) => !CONTENT_CODES.has(f.code));
-  const penalty = baseline.reduce((sum, f) => sum + penaltyOf(f), 0);
-  return {
-    score: Math.max(0, Math.min(100, 100 - penalty)),
-    threshold,
-    checks: {
-      total: findings.length,
-      ok: findings.filter((f) => f.severity === "ok").length,
-      warn: findings.filter((f) => f.severity === "warn").length,
-      error: findings.filter((f) => f.severity === "error").length,
-    },
-  };
-}
-
 /**
  * Collapse content catches so one lesson is reported once.
  *
@@ -286,7 +238,6 @@ export function decideVerdict(input: GateVerdictInput): GateVerdict {
     };
   });
 
-  const baselineHealth = computeBaselineHealth(findings, policy.scoreThreshold);
   const refusals = dedupeRefusals(findings);
   const hasErrors = findings.some((f) => f.severity === "error");
 
@@ -298,40 +249,8 @@ export function decideVerdict(input: GateVerdictInput): GateVerdict {
       : process.refuses
         ? "human — strict (enforcement.humanCommits)"
         : "human — process gates relaxed",
-    baseline_health: baselineHealth,
     refusals,
     process_gate_reason: process.reason,
   };
 }
 
-/**
- * The health finding, emitted only when it is worth reading: below target, and nothing else refused.
- *
- * When a documented lesson refuses a change, that lesson is the message. Appending "health 2% — top
- * penalties: …" underneath buries the one line the developer needs.
- */
-export function buildBaselineHealthFinding(
-  findings: GateFinding[],
-  health: BaselineHealth,
-  shouldBlock: boolean,
-): GateFinding | null {
-  if (shouldBlock || health.score >= health.threshold) return null;
-  const topPenalties = findings
-    .filter((f) => !CONTENT_CODES.has(f.code))
-    .map((f) => ({ code: f.code, penalty: penaltyOf(f) }))
-    .filter((p) => p.penalty > 0)
-    .sort((a, b) => b.penalty - a.penalty)
-    .slice(0, 3);
-  return {
-    severity: "warn",
-    code: "enforcement-score-below-threshold",
-    message:
-      `Repo knowledge-layer health ${health.score}% is below the ${health.threshold}% target` +
-      (topPenalties.length > 0
-        ? ` — top gaps: ${topPenalties.map((p) => `${p.code} (−${p.penalty})`).join(", ")}`
-        : "") +
-      ". This measures the repo's baseline, not this change; it never blocks.",
-    fix: "Fill the gaps above (bootstrap, briefing, recap), then rerun `hivelore enforce check`.",
-    impact: 0,
-  };
-}

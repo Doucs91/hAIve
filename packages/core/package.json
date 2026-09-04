@@ -1,6 +1,6 @@
 {
   "name": "@hivelore/core",
-  "version": "0.60.1",
+  "version": "0.61.0",
   "description": "Hivelore core - memory, anchors, lifecycle, and enforcement primitives for agent harnesses",
   "license": "Apache-2.0",
   "repository": {

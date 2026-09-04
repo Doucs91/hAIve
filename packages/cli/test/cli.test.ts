@@ -959,11 +959,9 @@ describe("Hivelore CLI integration", () => {
     const { stdout } = await run(workDir, ["enforce", "check", "--stage", "local", "--json", "--dir", workDir]);
     const report = JSON.parse(stdout) as {
       should_block: boolean;
-      score: { score: number; threshold: number };
       findings: Array<{ code: string }>;
     };
     expect(report.should_block).toBe(false);
-    expect(report.score.score).toBeGreaterThanOrEqual(report.score.threshold);
     expect(report.findings.some((f) => f.code === "briefing-loaded")).toBe(true);
   });
 
@@ -1684,12 +1682,10 @@ describe("Hivelore CLI integration", () => {
       // Nothing deterministic fired, so nothing refuses the push.
       expect(agent.should_block).toBe(false);
 
-      // The score is still reported when it is under target, but it is a measurement, never a verdict.
-      const scoreFinding = agent.findings.find((f) => f.code === "enforcement-score-below-threshold");
-      if (scoreFinding) {
-        expect(scoreFinding.severity).toBe("warn");
-        expect(scoreFinding.message).toContain("does not block");
-      }
+      // The knowledge-layer health score was removed in 0.61.0: it measured how many complaints an
+      // invocation produced, not the corpus, so it must not come back as a finding or a JSON field.
+      expect(agent.findings.some((f) => f.code === "enforcement-score-below-threshold")).toBe(false);
+      expect(agent).not.toHaveProperty("score");
 
       // Human context (HAIVE_AGENT=0 override): also advisory, and still labelled as a human actor.
       const human = JSON.parse(
