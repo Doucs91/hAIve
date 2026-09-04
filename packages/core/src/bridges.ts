@@ -108,6 +108,14 @@ export function bridgeMemorySummary(body: string): string {
   return oneLine.length > 140 ? oneLine.slice(0, 137) + "…" : oneLine;
 }
 
+/** Breadcrumb value by type: `attempt` first (purely preventive — most costly to miss), then the
+ * memories most likely to be silently contradicted (decision/architecture), then the rest. */
+function breadcrumbTypeRank(type: string): number {
+  if (type === "attempt") return 0;
+  if (type === "architecture" || type === "decision") return 1;
+  return 2;
+}
+
 /**
  * Filter and rank memories + sensors for bridge injection.
  * Pure — callers load data; this function does not read files.
@@ -130,9 +138,17 @@ export function prepareBridgeData(
       if (m.frontmatter.tags?.includes("stack-pack") || m.frontmatter.tags?.includes("seed")) return false;
       return s === "validated" || s === "proposed";
     })
+    // Rank the breadcrumb — it is NOT a file listing. Sorting by id (date-prefixed) surfaced the 8
+    // OLDEST memories and buried everything written after day one, including `attempt` lessons whose
+    // entire value is preventive (field report 2026-09-04 §1). Order: validated first, then by type
+    // value (attempts, then decisions/architecture), then most-recent first.
     .sort((a, b) => {
-      const score = (m: Memory): number => (m.frontmatter.status === "validated" ? 2 : 1);
-      return score(b) - score(a);
+      const statusScore = (m: Memory): number => (m.frontmatter.status === "validated" ? 0 : 1);
+      const s = statusScore(a) - statusScore(b);
+      if (s !== 0) return s;
+      const r = breadcrumbTypeRank(a.frontmatter.type) - breadcrumbTypeRank(b.frontmatter.type);
+      if (r !== 0) return r;
+      return b.frontmatter.id.localeCompare(a.frontmatter.id); // date DESC — recent first
     })
     .slice(0, max)
     .map((m) => ({
@@ -189,8 +205,10 @@ function renderSensorsBlock(blockSensors: BridgeSensor[]): string {
   ];
   for (const s of blockSensors) {
     const pathNote = s.paths.length > 0 ? ` _(applies to: ${s.paths.join(", ")})_` : "";
+    // One line per sensor: the corrective INSTRUCTION, not the regex. The hook applies the pattern
+    // (and applies it better than an agent reading it); injecting the full motif spent ~63% of the
+    // breadcrumb budget on information the agent cannot use (field report 2026-09-04 §1.1).
     lines.push(`- **${s.id}**${pathNote}: ${s.message}`);
-    if (s.pattern) lines.push(`  - Pattern: \`${s.pattern}\``);
   }
   lines.push("", BRIDGE_MARKERS.sensorsEnd);
   return lines.join("\n");

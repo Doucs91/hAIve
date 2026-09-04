@@ -131,6 +131,20 @@ describe("prepareBridgeData", () => {
     expect(topMemories[0]?.id).toBe(VALIDATED_MEMORY.frontmatter.id);
   });
 
+  it("ranks by value (attempts, then decisions/architecture, then recent-first) — not by filename (§1)", () => {
+    // Field report 2026-09-04 §1: the breadcrumb was `ls | sort | head`, surfacing the 8 OLDEST and
+    // burying recent decisions and every `attempt`. A newer attempt must beat an older convention.
+    const oldConvention = makeMemory({ id: "2026-08-01-convention-old", type: "convention", body: "## Old\nx" });
+    const oldDecision = makeMemory({ id: "2026-08-02-decision-old", type: "decision", body: "## Old decision\nx" });
+    const newDecision = makeMemory({ id: "2026-09-04-decision-new", type: "decision", body: "## New decision\nx" });
+    const attempt = makeMemory({ id: "2026-08-30-attempt-deadend", type: "attempt", body: "## Dead end\nDo not retry X." });
+    const { topMemories } = prepareBridgeData([oldConvention, oldDecision, newDecision, attempt], []);
+    expect(topMemories[0]?.id).toBe(attempt.frontmatter.id); // preventive first
+    expect(topMemories[1]?.id).toBe(newDecision.frontmatter.id); // recent decision before old one
+    expect(topMemories[2]?.id).toBe(oldDecision.frontmatter.id);
+    expect(topMemories[3]?.id).toBe(oldConvention.frontmatter.id); // plain convention last
+  });
+
   it("respects maxMemories cap", () => {
     const mems = Array.from({ length: 10 }, (_, i) =>
       makeMemory({ id: `mem-${i}`, slug: `mem-${i}` }),
@@ -163,6 +177,13 @@ describe("generateBridges", () => {
     const outputs = generateBridges(memories, sensors, { targets: ["cline", "windsurf"] });
     expect(outputs).toHaveLength(2);
     expect(outputs.map((o) => o.target)).toEqual(["cline", "windsurf"]);
+  });
+
+  it("injects the sensor's corrective instruction, not its regex (§1.1)", () => {
+    const [out] = generateBridges(memories, [makeSensor({ message: "Use the token, not a hardcoded colour", pattern: "bg-\\w+-\\d{3}" })], { targets: ["claude"] });
+    expect(out?.content).toContain("Use the token, not a hardcoded colour");
+    expect(out?.content).not.toContain("Pattern:");
+    expect(out?.content).not.toContain("bg-\\w+-\\d{3}");
   });
 
   it("supports the reach targets (cursor, claude, roo, gemini, aider)", () => {
@@ -244,10 +265,11 @@ describe("generateBridges", () => {
     }
   });
 
-  it("injects sensor pattern when present", () => {
+  it("does NOT inject the sensor regex — only its corrective instruction (§1.1)", () => {
     const outputs = generateBridges([], sensors);
     for (const output of outputs) {
-      expect(output.content).toContain(sensors[0]!.pattern!);
+      expect(output.content).toContain(sensors[0]!.message);
+      expect(output.content).not.toContain(sensors[0]!.pattern!);
     }
   });
 

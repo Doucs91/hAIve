@@ -83,29 +83,12 @@ export async function recordPreventionHits(
   for (const id of recordedIds) {
     await appendPreventionEvent(paths, { at, id, source, ...details[id] }).catch(() => { /* best-effort */ });
   }
-  // Durable proof: stamp `sensor.last_fired` into the memory file itself. `usage.json` lives in the
-  // gitignored cache, so a fresh clone otherwise inherits sensors with no record they ever fired
-  // (field report §4: 0/11 last_fired). This is a rare, debounced event — one line changes on a real
-  // catch — so it does not churn like a per-read counter would. Best-effort: never break the gate.
-  await stampSensorLastFired(paths, recordedIds, at).catch(() => { /* best-effort */ });
+  // Prevention proof lives ONLY in the gitignored cache (usage.json + the prevention log). It used to
+  // also be stamped into the memory's frontmatter so it survived a clone — but that runs DURING the
+  // pre-commit/pre-push hook and writes a git-TRACKED file, which dirties the tree mid-commit and
+  // broke `git checkout` (field report 2026-09-02 §3.1: a lone `last_fired:` line aborted a branch
+  // switch). A tool that runs inside `git commit` must never modify tracked files.
   return recordedIds;
-}
-
-/**
- * Write `sensor.last_fired` into the frontmatter of each memory that just recorded a prevention, so
- * the "this guard has demonstrably caught something" signal survives a clone (it otherwise lives only
- * in gitignored `usage.json`). Only rewrites a file whose value actually changed.
- */
-async function stampSensorLastFired(paths: HaivePaths, ids: string[], at: string): Promise<void> {
-  if (ids.length === 0 || !existsSync(paths.memoriesDir)) return;
-  const wanted = new Set(ids);
-  const loaded = await loadMemoriesFromDir(paths.memoriesDir);
-  for (const { memory, filePath } of loaded) {
-    const fm = memory.frontmatter;
-    if (!wanted.has(fm.id) || !fm.sensor || fm.sensor.last_fired === at) continue;
-    const next = { ...memory, frontmatter: { ...fm, sensor: { ...fm.sensor, last_fired: at } } };
-    await writeFile(filePath, serializeMemory(next), "utf8").catch(() => { /* best-effort */ });
-  }
 }
 
 export interface PreventionReceiptRow {

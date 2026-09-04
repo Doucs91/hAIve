@@ -108,17 +108,19 @@ describe("recordPreventionHits — the shared gate recorder", () => {
     expect(await loadPreventionEvents(paths)).toEqual([]);
   });
 
-  it("stamps sensor.last_fired into the memory file so the catch survives a clone (§4)", async () => {
-    // usage.json is gitignored, so without this the file would show last_fired: null forever.
+  it("does NOT write last_fired into the git-tracked memory file (it runs inside the commit hook)", async () => {
+    // Stamping a tracked file mid-commit dirtied the tree and broke `git checkout` (field report
+    // 2026-09-02 §3.1). Proof of a catch lives in the gitignored cache instead — the file is untouched.
     const mem = sensorMemory();
     await mkdir(paths.teamDir, { recursive: true });
     const file = path.join(paths.teamDir, `${mem.frontmatter.id}.md`);
-    await writeFile(file, serializeMemory(mem), "utf8");
+    const before = serializeMemory(mem);
+    await writeFile(file, before, "utf8");
 
     const at = new Date("2026-08-29T12:00:00.000Z");
-    await recordPreventionHits(paths, [mem.frontmatter.id], "sensor", at);
+    const recorded = await recordPreventionHits(paths, [mem.frontmatter.id], "sensor", at);
 
-    const written = await readFile(file, "utf8");
-    expect(written).toMatch(/last_fired:\s*'?2026-08-29T12:00:00\.000Z'?/);
+    expect(recorded).toEqual([mem.frontmatter.id]); // the catch was still recorded (in usage.json)
+    expect(await readFile(file, "utf8")).toBe(before); // …but the tracked file did not change
   });
 });

@@ -100,8 +100,9 @@ export const CI_WORKFLOW = `name: hivelore-sync
 on:
   push:
     branches: [main, master]
+  # Every PR, whatever its target branch — gitflow repos merge into develop, and the memory/stale/
+  # eval checks must run there too (field report 2026-09-04 §4.3: PR checks were dead on non-main PRs).
   pull_request:
-    branches: [main, master]
 
 jobs:
   # On push to main/master: sync anchors + auto-promote + commit changes
@@ -139,6 +140,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -153,10 +155,15 @@ jobs:
 
       - name: verify memory anchors touched by this PR
         id: verify
+        env:
+          NO_COLOR: '1'
         run: |
-          hivelore memory verify 2>&1 | tee /tmp/haive-verify.txt || true
-          STALE=$(grep -c 'stale' /tmp/haive-verify.txt || echo 0)
-          echo "stale_count=$STALE" >> "$GITHUB_OUTPUT"
+          hivelore memory verify 2>&1 | sed -r 's/\x1b\[[0-9;]*m//g' | tee /tmp/haive-verify.txt || true
+          # Read the real count ("… · N stale · …"), NOT lines containing the word "stale" — that
+          # matched the "0 stale" summary and "staleness cannot be detected", so it never hit 0 and
+          # posted a false alarm on every PR (field report 2026-09-04 §4.2).
+          STALE=$(grep -oE '[0-9]+ stale' /tmp/haive-verify.txt | grep -oE '^[0-9]+' | head -1)
+          echo "stale_count=\${STALE:-0}" >> "$GITHUB_OUTPUT"
 
       - name: comment on PR if stale memories detected
         if: steps.verify.outputs.stale_count != '0'

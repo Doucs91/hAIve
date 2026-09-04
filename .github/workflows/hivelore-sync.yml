@@ -3,8 +3,9 @@ name: hivelore-sync
 on:
   push:
     branches: [main, master]
+  # Every PR, whatever its target branch — this repo merges into develop (see
+  # convention-git-workflow-develop-vers-main), so PR checks must run there too.
   pull_request:
-    branches: [main, master]
 
 jobs:
   # On push to main/master: sync anchors + auto-promote + commit changes
@@ -52,6 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,10 +78,13 @@ jobs:
 
       - name: verify memory anchors touched by this PR
         id: verify
+        env:
+          NO_COLOR: '1'
         run: |
-          hivelore memory verify 2>&1 | tee /tmp/hivelore-verify.txt || true
-          STALE=$(grep -c 'stale' /tmp/hivelore-verify.txt || echo 0)
-          echo "stale_count=$STALE" >> "$GITHUB_OUTPUT"
+          hivelore memory verify 2>&1 | sed -r 's/\x1b\[[0-9;]*m//g' | tee /tmp/hivelore-verify.txt || true
+          # Read the real count ("… · N stale · …"), not lines containing the word "stale".
+          STALE=$(grep -oE '[0-9]+ stale' /tmp/hivelore-verify.txt | grep -oE '^[0-9]+' | head -1)
+          echo "stale_count=${STALE:-0}" >> "$GITHUB_OUTPUT"
 
       - name: comment on PR if stale memories detected
         if: steps.verify.outputs.stale_count != '0'

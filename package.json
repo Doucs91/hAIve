@@ -1,7 +1,7 @@
 {
   "name": "hivelore-monorepo",
   "private": true,
-  "version": "0.58.1",
+  "version": "0.59.0",
   "description": "Hivelore - the deterministic policy gate for agent-written code (rules live as repo-native team memory)",
   "license": "Apache-2.0",
   "repository": {

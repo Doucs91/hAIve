@@ -3317,6 +3317,11 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
   if (report.should_block) ui.error("Hivelore enforcement gate failed.");
   else if (changeActionable.length > 0) ui.success(`Hivelore gate passed${stageLabel(report)} — ${changeActionable.length} advisory finding(s), 0 blocking.`);
   else ui.success(`Hivelore enforcement gate passed${stageLabel(report)}.`);
+  // A blocking rule can be a false positive. Name the escape hatch at the one moment it is natural —
+  // the block itself — or friction is only ever reported into commit messages (field report §2.1).
+  if (report.should_block && report.findings.some((f) => CONTENT_CATCH_CODES.has(f.code))) {
+    console.log(ui.dim("  Blocked wrongly? Flag it with the `report_friction` MCP tool — a human reviews it, nothing is sent."));
+  }
 }
 
 /** Name the hook/stage in the pass line so pre-commit (then pre-push on the same push) don't read

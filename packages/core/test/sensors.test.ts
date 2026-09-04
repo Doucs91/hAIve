@@ -153,6 +153,23 @@ describe("sensors", () => {
     ).toBeNull();
   });
 
+  it("does not fire on a pattern inside a MULTI-LINE block comment (field report 2026-09-04 §3.1)", () => {
+    const colour = sensor({ pattern: "bg-emerald-600", severity: "block" });
+    // The forbidden token sits on a MIDDLE line of a /* … */ block — it starts with neither the
+    // opener nor `*`, so a per-line stripper missed it. Stateful block tracking must blank it.
+    const cssComment = [
+      "/*",
+      "  This block is the only source of colours. A class like bg-emerald-600 written",
+      "  elsewhere escapes the system.",
+      "*/",
+      ".btn { color: var(--accent); }",
+    ].join("\n");
+    expect(runRegexSensor("m1", colour, { path: "frontend/src/index.css", content: cssComment })).toBeNull();
+    // …but a real hardcoded class in a rule still fires.
+    const real = ".btn { }\n.x { @apply bg-emerald-600; }";
+    expect(runRegexSensor("m1", colour, { path: "frontend/src/index.css", content: real })).not.toBeNull();
+  });
+
   it("still fires when the pattern appears in real code, not just prose", () => {
     const colour = sensor({ pattern: "bg-emerald-600", severity: "block" });
     // A className string is CODE, not a comment — string literals stay intact so this still fires.

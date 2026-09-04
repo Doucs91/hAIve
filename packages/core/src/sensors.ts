@@ -189,16 +189,27 @@ function commentSyntaxForPath(path: string): CommentSyntax | null {
   return COMMENT_SYNTAX_BY_EXT[base.slice(dot + 1).toLowerCase()] ?? null;
 }
 
-/** Blank the comment spans of one line, preserving column positions (comment chars → spaces). */
-function blankCommentsOnLine(line: string, syntax: CommentSyntax): string {
-  // A block-comment continuation (`* @param`, `*/`, or a lone `*`) is entirely prose. Require the
-  // `*` to be followed by whitespace / `/` / end so real code like `*ptr` or `*= 2` is left alone.
-  if (syntax.starContinuation && /^\*(\s|\/|$)/.test(line.trimStart())) {
-    return " ".repeat(line.length);
-  }
+/** Blank the comment spans of one line, threading multi-line block-comment state. `inBlock` says we
+ * opened a block comment on an earlier line that has not closed yet; the return says whether it is
+ * still open at end of line. Preserves column positions (comment chars → spaces). */
+function blankCommentsOnLine(line: string, syntax: CommentSyntax, inBlock: boolean): { text: string; inBlock: boolean } {
   let out = "";
   let stringDelim: string | null = null;
-  for (let i = 0; i < line.length; i++) {
+  let i = 0;
+  // Resume an open block comment from a previous line: blank up to its close, then scan the rest.
+  if (inBlock) {
+    if (!syntax.block) return { text: line, inBlock: false };
+    const close = syntax.block[1];
+    const closeIdx = line.indexOf(close);
+    if (closeIdx === -1) return { text: " ".repeat(line.length), inBlock: true };
+    out += " ".repeat(closeIdx + close.length);
+    i = closeIdx + close.length;
+  } else if (syntax.starContinuation && /^\*(\s|\/|$)/.test(line.trimStart())) {
+    // A block-comment continuation (`* @param`, `*/`, or a lone `*`) is entirely prose. Require the
+    // `*` to be followed by whitespace / `/` / end so real code like `*ptr` or `*= 2` is left alone.
+    return { text: " ".repeat(line.length), inBlock: false };
+  }
+  for (; i < line.length; i++) {
     const ch = line[i]!;
     if (stringDelim) {
       out += ch;
@@ -211,9 +222,10 @@ function blankCommentsOnLine(line: string, syntax: CommentSyntax): string {
       const [open, close] = syntax.block;
       if (line.startsWith(open, i)) {
         const closeIdx = line.indexOf(close, i + open.length);
-        const end = closeIdx === -1 ? line.length : closeIdx + close.length;
+        // Opened but not closed on this line → the rest is comment; carry the state to the next line.
+        if (closeIdx === -1) { out += " ".repeat(line.length - i); return { text: out, inBlock: true }; }
+        const end = closeIdx + close.length;
         out += " ".repeat(end - i);
-        if (closeIdx === -1) break;
         i = end - 1;
         continue;
       }
@@ -225,17 +237,27 @@ function blankCommentsOnLine(line: string, syntax: CommentSyntax): string {
     if (hitLineComment) break;
     out += ch;
   }
-  return out;
+  return { text: out, inBlock: false };
 }
 
 /**
  * Blank comment spans in scannable text so a sensor's regex matches CODE, not the prose that
- * documents it. Returns `content` unchanged for unknown file types. Pure.
+ * documents it — including MULTI-LINE block comments whose forbidden token sits on a middle line
+ * that starts with neither the opener nor `*` (field report 2026-09-04 §3.1: a `bg-emerald-600` in a
+ * multi-line CSS comment still tripped the sensor because the earlier fix was purely per-line).
+ * Returns `content` unchanged for unknown file types. Pure.
  */
 export function stripCommentsForScan(content: string, path: string): string {
   const syntax = commentSyntaxForPath(path);
   if (!syntax) return content;
-  return content.split("\n").map((l) => blankCommentsOnLine(l, syntax)).join("\n");
+  let inBlock = false;
+  const out: string[] = [];
+  for (const line of content.split("\n")) {
+    const res = blankCommentsOnLine(line, syntax, inBlock);
+    out.push(res.text);
+    inBlock = res.inBlock;
+  }
+  return out.join("\n");
 }
 
 /**

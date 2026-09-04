@@ -6,6 +6,49 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.59.0] — Rank the breadcrumb, finish the comment fix, stop breaking git
+
+The 09-02 and 09-04 field reports converged: the one artefact that delivers value — the memory block
+injected into `CLAUDE.md` — was being filled by `ls | sort | head`, and three shipped defects were
+eroding trust around it. This release fixes the highest-yield items from both reports' priority lists.
+
+### The breadcrumb is ranked, not alphabetically sorted (§1, §1.1)
+
+- **The `CLAUDE.md`/AGENTS.md memory list now ranks by value, not filename.** Sorting by id (which is
+  date-prefixed) surfaced the 8 OLDEST memories and buried everything written after day one —
+  including every `attempt`, whose entire worth is stopping a repeat of a known dead end. The order is
+  now: validated first, then `attempt`, then `decision`/`architecture`, then the rest, most-recent
+  first within each tier.
+- **A block sensor's breadcrumb is now its corrective instruction, not its regex.** The full pattern
+  was ~63% of the breadcrumb budget and taught the agent nothing the hook doesn't already enforce.
+
+### Sensors finish learning to read comments (§3.1)
+
+- **Multi-line block comments are now stripped before a regex sensor matches.** The v0.57.7 fix was
+  per-line, so a forbidden token on a MIDDLE line of a `/* … */` block (which starts with neither the
+  opener nor `*`) still tripped the sensor — exactly the recurring CSS `bg-emerald-600`-in-a-comment
+  false positive. Comment state is now tracked across lines. String literals are still kept, so a
+  sensor can target a bad literal in a string.
+
+### A tool that runs during `git commit` no longer writes tracked files (§3.1 09-02)
+
+- **`sensor.last_fired` is no longer stamped into the memory `.md`.** Writing a git-tracked file from
+  inside the pre-commit/pre-push hook dirtied the tree mid-commit and aborted a `git checkout`,
+  stranding the next command on the wrong branch. Prevention proof lives in the gitignored cache
+  (`usage.json` + the prevention log), where it belongs.
+
+### Smaller, sharper (§2.1, §4)
+
+- **A blocked gate now names the escape hatch:** "Blocked wrongly? Flag it with `report_friction`."
+  Friction was only ever reported into commit messages because the one natural moment — the block —
+  never mentioned the tool.
+- **The generated `hivelore-sync.yml` is fixed in three places:** PR checks (memory-check, stale-check,
+  eval-gate) now run on **every** PR, not only PRs into `main`/`master` (gitflow repos merge into
+  `develop`, and two blocking sensors stayed invisible for six days because of this); `pr-stale-check`
+  now declares `contents: read` so `actions/checkout` works on private repos; and the stale count is
+  read from the real "N stale" figure instead of `grep -c stale`, which counted the "0 stale" summary
+  line and posted a false "stale memories detected" alarm on every PR.
+
 ## [0.58.1] — Recaps keep their history; sensors nudge toward AST
 
 ### The recap stops forgetting the last three sessions (§5.6)

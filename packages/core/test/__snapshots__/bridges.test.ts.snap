@@ -53,7 +53,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -114,7 +113,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -175,7 +173,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -236,7 +233,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -297,7 +293,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -358,7 +353,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -419,7 +413,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -484,7 +477,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -545,7 +537,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -606,7 +597,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -667,7 +657,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
@@ -728,7 +717,6 @@ The patterns below are blocked by the repo enforcement gate.
 Introducing them will fail the pre-commit check (\`hivelore enforce check\`).
 
 - **test-gotcha-2026-01-01**: Do not use the old API
-  - Pattern: \`oldApi\\(\`
 
 <!-- haive:sensors-end -->
 
