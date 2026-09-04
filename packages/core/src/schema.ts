@@ -76,6 +76,14 @@ export const SensorSchema = z.object({
   timeout_ms: z.number().int().positive().optional(),
   /** Glob-ish path prefixes the sensor applies to. Falls back to the memory's anchor paths when empty. */
   paths: z.array(z.string()).default([]),
+  /**
+   * Glob-ish paths the sensor must NOT fire on, even when they fall inside `paths`. Lets a
+   * production-only lesson (e.g. "no `any`") skip test doubles and fixtures without narrowing its
+   * scope file by file — the missing negation that made `paths: ['**']` fire on every `.test.ts`
+   * (field report 2026-09-02 §3.2). A lesson that IS about tests (e.g. "no `LocalDate.now()` in a
+   * test") simply leaves this empty, so it still fires there.
+   */
+  exclude: z.array(z.string()).optional(),
   /** LLM-facing self-correction message: what was done wrong and what to do instead. */
   message: z.string().min(1),
   /**

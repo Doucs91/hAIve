@@ -202,6 +202,10 @@ function renderSensorsBlock(blockSensors: BridgeSensor[]): string {
     "The patterns below are blocked by the repo enforcement gate.",
     "Introducing them will fail the pre-commit check (`hivelore enforce check`).",
     "",
+    "Wrong about one specific line? Waive that line — `// hivelore:allow <memory-id> — <reason>` at",
+    "end of line — instead of deleting the rule or rewriting correct code. It covers that line only",
+    "and is reported. Repeating it means the scope is wrong: narrow `paths`/`exclude`/`absent`.",
+    "",
   ];
   for (const s of blockSensors) {
     const pathNote = s.paths.length > 0 ? ` _(applies to: ${s.paths.join(", ")})_` : "";

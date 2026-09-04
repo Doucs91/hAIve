@@ -761,3 +761,69 @@ describe("addedLineNumbersFromDiff", () => {
     expect(map.has("src/missing.ts")).toBe(false);
   });
 });
+
+describe("sensor scope: exclusions and documentation (field reports 2026-09-02 §3.2, 2026-09-04 §3.1)", () => {
+  it("honours an explicit exclude list even inside the sensor's own paths", () => {
+    // `paths: ['**']` is the right SCOPE for a repo-wide convention and the wrong one for its test
+    // doubles: `no-any` fired on a fake React component and a fake useTranslation, where narrowing
+    // the type buys nothing because the value never reaches production.
+    const s = sensor({ paths: ["**"], exclude: ["**/*.test.*", "**/__tests__/**"] });
+    expect(sensorAppliesToPath(s, [], "src/features/Profile.tsx")).toBe(true);
+    expect(sensorAppliesToPath(s, [], "src/features/Profile.test.tsx")).toBe(false);
+    expect(sensorAppliesToPath(s, [], "src/__tests__/helpers.tsx")).toBe(false);
+  });
+
+  it("keeps firing in tests when the lesson IS about tests (empty exclude)", () => {
+    const s = sensor({ paths: ["**"] });
+    expect(sensorAppliesToPath(s, [], "src/date.test.ts")).toBe(true);
+  });
+
+  it("never matches a documentation file reached by a wildcard, but does when named exactly", () => {
+    const wildcard = sensor({ paths: ["**"] });
+    expect(sensorAppliesToPath(wildcard, [], "docs/architecture.md")).toBe(false);
+    expect(sensorAppliesToPath(wildcard, [], "README.md")).toBe(false);
+    const named = sensor({ paths: ["docs/architecture.md"] });
+    expect(sensorAppliesToPath(named, [], "docs/architecture.md")).toBe(true);
+  });
+});
+
+describe("inline hivelore:allow waivers (field report 2026-09-04 §3.1)", () => {
+  const s = sensor({ pattern: "bg-emerald-600", severity: "block" });
+
+  it("suppresses the match on the waived line and records the reason", () => {
+    const waivers: import("../src/sensors.js").SensorWaiver[] = [];
+    const hit = runRegexSensor(
+      "2026-08-31-convention-jetons-de-conception",
+      s,
+      { path: "src/legacy/Badge.tsx", content: 'const cls = "bg-emerald-600"; // hivelore:allow jetons-de-conception — vendor widget, not themable' },
+      waivers,
+    );
+    expect(hit).toBeNull();
+    expect(waivers).toHaveLength(1);
+    expect(waivers[0]!.reason).toBe("vendor widget, not themable");
+  });
+
+  it("only applies end-of-line — a waiver on the preceding line does not cover the next one", () => {
+    const hit = runRegexSensor("2026-08-31-convention-jetons-de-conception", s, {
+      path: "src/legacy/Badge.tsx",
+      content: '// hivelore:allow jetons-de-conception — vendor widget\nconst cls = "bg-emerald-600";',
+    });
+    expect(hit).not.toBeNull();
+  });
+
+  it("refuses a waiver naming a different sensor, or carrying no reason", () => {
+    const other = { path: "a.tsx", content: 'x = "bg-emerald-600" // hivelore:allow some-other-rule — nope' };
+    expect(runRegexSensor("2026-08-31-convention-jetons-de-conception", s, other)).not.toBeNull();
+    const reasonless = { path: "a.tsx", content: 'x = "bg-emerald-600" // hivelore:allow jetons-de-conception' };
+    expect(runRegexSensor("2026-08-31-convention-jetons-de-conception", s, reasonless)).not.toBeNull();
+  });
+
+  it("waives only the line it is written on, never the rest of the file", () => {
+    const hit = runRegexSensor("2026-08-31-convention-jetons-de-conception", s, {
+      path: "a.tsx",
+      content: 'a = "bg-emerald-600" // hivelore:allow jetons-de-conception — one-off\nb = "bg-emerald-600"',
+    });
+    expect(hit).not.toBeNull();
+    expect(hit!.matched_line).toContain('b = "bg-emerald-600"');
+  });
+});

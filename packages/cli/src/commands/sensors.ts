@@ -89,6 +89,7 @@ interface SensorsProposeOptions {
   fromFix?: string;
   flags?: string;
   paths?: string;
+  exclude?: string;
   replace?: boolean;
   json?: boolean;
   dir?: string;
@@ -505,6 +506,7 @@ export function registerSensors(program: Command): void {
     .option("--red-ref <ref>", "kind=shell|test: pre-fix commit/ref — validation replays it in a scratch worktree and requires the oracle to FAIL there (records red_proven)")
     .option("--flags <flags>", "regex flags (e.g. i)")
     .option("--paths <csv>", "override scope paths (defaults to the memory anchors)")
+    .option("--exclude <csv>", "paths the sensor must NOT fire on, even inside --paths (e.g. '**/*.test.*,**/__tests__/**' for a production-only lesson)")
     .option("--replace", "deliberately replace a DIFFERENT sensor already on this memory (otherwise refused, to avoid silent loss)", false)
     .option("--json", "emit a machine-readable proposal verdict", false)
     .option("-d, --dir <dir>", "project root")
@@ -550,6 +552,7 @@ export function registerSensors(program: Command): void {
             red_ref: opts.redRef,
             flags: undefined,
             paths: opts.paths ? opts.paths.split(",").map((p) => p.trim()).filter(Boolean) : [],
+            exclude: opts.exclude ? opts.exclude.split(",").map((p) => p.trim()).filter(Boolean) : [],
             replace: Boolean(opts.replace),
             require_present: false,
           },

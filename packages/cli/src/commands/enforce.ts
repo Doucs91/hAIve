@@ -601,6 +601,21 @@ async function checkPostIncidentScaffolds(
   }
 }
 
+/**
+ * Demote findings to advisory: an `error` becomes a `warn` and stops costing score.
+ *
+ * `enforce finish` mixes three natures of check, and only the first is Hivelore's mandate:
+ * KNOWLEDGE (uncaptured failure, stale corpus) blocks; GIT HYGIENE warns; INFRASTRUCTURE STATE
+ * (someone's CI quota, a flaky runner) is none of a knowledge tool's business. Blocking on the last
+ * two makes the exit gate unpassable for reasons the agent cannot fix, and the only available exit
+ * is to ignore it — which also discards the checks that were right (field report 2026-09-04 §5).
+ */
+function advisoryOnly(findings: EnforcementFinding[]): EnforcementFinding[] {
+  return findings.map((finding) =>
+    finding.severity === "error" ? { ...finding, severity: "warn" as const, impact: 0 } : finding,
+  );
+}
+
 async function buildFinishReport(dir: string | undefined): Promise<EnforcementReport> {
   const root = findProjectRoot(dir);
   const paths = resolveHaivePaths(root);
@@ -631,10 +646,13 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
 
   findings.push(...await checkFailureCapture(paths, config));
   findings.push(...await checkPostIncidentScaffolds(paths));
-  // First-agent bootstrap: declaring the task done with a still-cold knowledge layer means the first
-  // agent never paid the baseline that later agents depend on. `finish` is a sharing point (like
-  // pre-push), so it enforces; the assessment returns ready on its own for repos with no code areas.
-  findings.push(...await checkBootstrapComplete(paths, config, true, "pre-push"));
+  // First-agent bootstrap is a PROJECT, not a precondition for finishing one bugfix. Blocking here
+  // made `finish` unpassable for entire sessions, and its only fix ("invoke the bootstrap_repo MCP
+  // prompt") is unreachable whenever the MCP layer is down — which is exactly when the gate fires.
+  // A rule that cannot be satisfied does not teach the rule, it teaches ignoring the gate, and that
+  // discredits `github-actions-pass` alongside it (field reports 2026-09-02 §3.3, 2026-09-04 §5).
+  // Kept as a warning so the gap stays visible; enforcement lives at pre-push/ci where it belongs.
+  findings.push(...advisoryOnly(await checkBootstrapComplete(paths, config, true, "pre-push")));
 
   const status = await getGitSyncStatus(root);
   if (!status.available) {
@@ -663,9 +681,15 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
   // worktree dirty forever, blocking this gate on every later task.
   const modifiedCount = dirtyFiles.length - untrackedFiles.length;
   const untrackedOnly = dirtyFiles.length > 0 && modifiedCount === 0;
+  // Untracked-only is git HYGIENE, not lost work: nothing tracked was modified, so there is no
+  // change at risk of being left behind. It blocked sessions on files Hivelore itself had just
+  // written (`mem_save` creates a memory, then the exit gate refuses to close because that memory is
+  // untracked) — the tool manufacturing its own blocker. Warn, and keep blocking real uncommitted
+  // work (field report 2026-09-04 §5).
+  const hygieneOnly = untrackedOnly && shippableDirty.length === 0;
   if (dirtyFiles.length > 0) {
     findings.push({
-      severity: "error",
+      severity: hygieneOnly ? "warn" : "error",
       code: shippableDirty.length > 0 ? "git-sync-uncommitted-shippable" : "git-sync-uncommitted-changes",
       message: shippableDirty.length > 0
         ? `${shippableDirty.length} shippable file(s) are not committed.`
@@ -681,9 +705,11 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
           : "Commit and push these changes before reporting the task done.",
       reason: "The multi-agent git-sync decision requires agents to leave completed work committed and pushed, not as a local diff.",
       affected_files: dirtyFiles.slice(0, 12),
-      impact: 100,
+      impact: hygieneOnly ? 0 : 100,
     });
-    return finishReport(root, initialized, mode, findings, config);
+    // Only a real blocker short-circuits: a hygiene warning must not hide the checks that follow
+    // (release protocol, CI verdict) behind an untracked scratch file.
+    if (!hygieneOnly) return finishReport(root, initialized, mode, findings, config);
   }
 
   if (regeneratedOnly.length > 0) {
@@ -695,11 +721,13 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
     });
   }
 
-  findings.push({
-    severity: "ok",
-    code: "git-worktree-clean",
-    message: "No uncommitted worktree changes remain.",
-  });
+  if (!hygieneOnly) {
+    findings.push({
+      severity: "ok",
+      code: "git-worktree-clean",
+      message: "No uncommitted worktree changes remain.",
+    });
+  }
 
   if (!status.upstream) {
     findings.push({
@@ -1970,7 +1998,22 @@ async function runSensorGate(
     // Presence sensors are kind=regex but evaluated separately (on final content), so keep them out
     // of the added-lines pass and its ledger to avoid a duplicate silent row.
     const plainRegexMemories = regexSensorMemories.filter((m) => !m.frontmatter.sensor!.require_present);
-    const hits = plainRegexMemories.length > 0 ? runSensors(plainRegexMemories, targets) : [];
+    // Inline `hivelore:allow <slug> — reason` waivers are honoured but never silent: a suppressed
+    // match is surfaced as an info finding so the exception stays auditable in the gate output and
+    // in CI (field report 2026-09-04 §3.1 — a rule with no exception outlet ends up deleted).
+    const waivers = [] as import("@hivelore/core").SensorWaiver[];
+    const hits = plainRegexMemories.length > 0 ? runSensors(plainRegexMemories, targets, waivers) : [];
+    for (const waiver of waivers) {
+      findings.push({
+        severity: "info",
+        code: "sensor-waived",
+        message: `Sensor waived inline — ${waiver.memory_id}: ${waiver.reason}${waiver.file ? ` (${waiver.file})` : ""}\n  waived: ${waiver.line}`,
+        fix: "If this exception is the rule rather than the exception, narrow the sensor (`paths`/`exclude`/`absent`) instead of repeating the waiver.",
+        memory_ids: [waiver.memory_id],
+        file: waiver.file,
+        matched_line: waiver.line,
+      });
+    }
     for (const memory of plainRegexMemories) {
       const sensor = memory.frontmatter.sensor!;
       if (!targets.some((target) => sensorAppliesToPath(sensor, memory.frontmatter.anchor.paths, target.path))) continue;
@@ -1996,7 +2039,9 @@ async function runSensorGate(
           severity: "error",
           code: "sensor-block",
           message: `Block sensor fired — ${hit.memory_id}: ${hit.message}${where}${incidentSuffix(hit.sensor.incident)}${matched}`,
-          fix: "Remove the flagged pattern, or run `hivelore sensors check` to inspect the match.",
+          fix: "Remove the flagged pattern. If this specific line is a legitimate exception, waive it in place: " +
+            "`// hivelore:allow " + hit.memory_id + " — <reason>` at the end of the line (that line only, and it is reported). " +
+            "`hivelore sensors check` shows the match.",
           impact: 45,
           memory_ids: [hit.memory_id],
           file: hit.file,
@@ -2896,13 +2941,37 @@ async function verifyGithubActionsForHead(
   const failedCore = failed.filter((run) => !isExternalTransientWorkflow(run));
   const failedExternal = failed.filter((run) => isExternalTransientWorkflow(run));
 
-  if (failedCore.length > 0) {
+  // A core workflow that failed only on plumbing (artifact upload over the account's storage quota,
+  // a cache or toolchain-setup step) says nothing about the change: the build and the tests ran and
+  // passed. Blocking the exit on someone's billing state puts a knowledge tool in charge of an
+  // infrastructure problem the agent cannot fix, and the only way out is to ignore the gate
+  // (field report 2026-09-04 §5 — 529 + 484 tests green, `finish` refused on an artifact quota).
+  const infraFailed: GithubActionsRun[] = [];
+  const realFailed: GithubActionsRun[] = [];
+  for (const run of failedCore) {
+    (await failedOnInfrastructureOnly(run, root) ? infraFailed : realFailed).push(run);
+  }
+
+  if (realFailed.length > 0) {
     return [{
       severity: "error",
       code: "github-actions-failed",
-      message: `${failedCore.length}/${runs.length} GitHub Actions workflow run(s) for HEAD did not pass: ${formatGithubRunNames(failedCore)}.`,
+      message: `${realFailed.length}/${runs.length} GitHub Actions workflow run(s) for HEAD did not pass: ${formatGithubRunNames(realFailed)}.`,
       fix: "Inspect the failed run logs with `gh run view <run-id> --log`, fix the issue, push the fix, then rerun `hivelore enforce finish`.",
       impact: 80,
+    }];
+  }
+
+  if (infraFailed.length > 0) {
+    return [{
+      severity: "warn",
+      code: "github-actions-infrastructure-failed",
+      message:
+        `${infraFailed.length}/${runs.length} workflow run(s) for HEAD failed on INFRASTRUCTURE steps only ` +
+        `(artifact/cache/toolchain plumbing), not on build or test: ${formatGithubRunNames(infraFailed)}. ` +
+        "Not blocking — this is not a defect in the change.",
+      fix: "Fix the runner-side cause when you can (artifact storage quota, cache eviction, registry outage), or `gh run rerun <run-id>`. It is not required to finish.",
+      impact: 0,
     }];
   }
 
@@ -2923,6 +2992,36 @@ async function verifyGithubActionsForHead(
     code: "github-actions-pass",
     message: `All ${runs.length} GitHub Actions workflow run(s) for HEAD completed successfully.`,
   }];
+}
+
+/**
+ * Steps that are runner plumbing rather than a verdict on the code: they move artifacts around,
+ * warm caches, or install the toolchain. When one of these is the ONLY thing that failed, the
+ * repository's own build/test steps ran and succeeded.
+ */
+const INFRASTRUCTURE_STEP = /(upload|download)[- ]?artifact|actions\/(cache|setup-|checkout)|^set ?up job$|^post /i;
+
+/**
+ * Did this failed run fail exclusively on infrastructure steps? Reads the run's jobs (one `gh` call,
+ * only ever on an already-failed run) and looks at which STEPS failed — no log download. Answers
+ * false on any doubt (unreadable jobs, an unrecognised failed step), so the gate keeps blocking
+ * whenever we cannot prove the failure was plumbing.
+ */
+async function failedOnInfrastructureOnly(run: GithubActionsRun, root: string): Promise<boolean> {
+  if (!run.databaseId) return false;
+  let jobs: { steps?: { name?: string; conclusion?: string | null }[] }[];
+  try {
+    const raw = await runCommand("gh", ["run", "view", String(run.databaseId), "--json", "jobs"], root);
+    jobs = (JSON.parse(raw) as { jobs?: typeof jobs }).jobs ?? [];
+  } catch {
+    return false;
+  }
+  const failedSteps = jobs
+    .flatMap((job) => job.steps ?? [])
+    .filter((step) => step.conclusion === "failure")
+    .map((step) => step.name ?? "");
+  if (failedSteps.length === 0) return false; // job died before/outside its steps — can't attribute it
+  return failedSteps.every((name) => INFRASTRUCTURE_STEP.test(name));
 }
 
 /** External integrations whose failures are advisory (flaky network/timeout), not product
@@ -3255,8 +3354,14 @@ function printBlockHeadline(report: EnforcementReport): void {
 
 /** Codes that describe the repo's standing baseline rather than the change being committed. Kept in
  * the report (doctor, CI, --explain) but hidden from the quiet interactive gate — they never block
- * and were the most frequent non-actionable nags (field report 2026-09-01 §5.4). */
-const STANDING_STATE_CODES = new Set(["enforcement-score-below-threshold", "decision-coverage-missing"]);
+ * and were the most frequent non-actionable nags (field reports 2026-09-01 §5.4, 2026-09-02 §3.4:
+ * the same two process warnings printed on all ~20 commits of a session). */
+const STANDING_STATE_CODES = new Set([
+  "enforcement-score-below-threshold",
+  "decision-coverage-missing",
+  "briefing-missing",
+  "bootstrap-incomplete",
+]);
 
 function printReport(report: EnforcementReport, json: boolean, explain = false, quiet = false): void {
   if (json) {

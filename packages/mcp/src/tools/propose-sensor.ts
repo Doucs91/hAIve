@@ -121,6 +121,15 @@ export const ProposeSensorInputSchema = {
     .array(z.string())
     .default([])
     .describe("Override scope paths. Defaults to the memory's anchor paths."),
+  exclude: z
+    .array(z.string())
+    .default([])
+    .describe(
+      "Glob-ish paths the sensor must NOT fire on, even inside `paths`. Set this for a PRODUCTION-ONLY " +
+      "lesson so it skips test doubles/fixtures — e.g. exclude ['**/*.test.*','**/*.spec.*'," +
+      "'**/__tests__/**','**/*.stories.*','**/*.d.ts']. Leave empty for a lesson that IS about tests " +
+      "(it should still fire there). Documentation files (.md/.rst/…) are already skipped automatically.",
+    ),
   replace: z
     .boolean()
     .default(false)
@@ -479,6 +488,7 @@ export async function proposeSensor(
       ...(input.language ? { language: input.language } : {}),
       ...(input.absent ? { absent: input.absent } : {}),
       paths: anchorPathsAst,
+      ...(input.exclude?.length ? { exclude: input.exclude } : {}),
       message: input.message?.trim() || deriveMessage(found.memory.body, pattern ?? "AST rule", input.absent),
       ...(input.incident?.trim() ? { incident: input.incident.trim() } : {}),
       severity: input.severity,
@@ -590,6 +600,7 @@ export async function proposeSensor(
       command: input.command!.trim(),
       ...(input.timeout_ms ? { timeout_ms: input.timeout_ms } : {}),
       paths: anchorPathsCmd,
+      ...(input.exclude?.length ? { exclude: input.exclude } : {}),
       message: input.message?.trim() || deriveMessage(found.memory.body, input.command!.trim(), undefined),
       ...(input.incident?.trim() ? { incident: input.incident.trim() } : {}),
       ...(redProven ? { red_proven: true } : {}),
@@ -671,6 +682,7 @@ export async function proposeSensor(
       require_present: true,
       ...(input.flags ? { flags: input.flags } : {}),
       paths: anchorPaths,
+      ...(input.exclude?.length ? { exclude: input.exclude } : {}),
       message: input.message?.trim() || deriveMessage(found.memory.body, input.pattern!, undefined),
       ...(input.incident?.trim() ? { incident: input.incident.trim() } : {}),
       severity: input.severity,
@@ -696,6 +708,7 @@ export async function proposeSensor(
     ...(input.absent ? { absent: input.absent } : {}),
     ...(input.flags ? { flags: input.flags } : {}),
     paths: anchorPaths,
+    ...(input.exclude?.length ? { exclude: input.exclude } : {}),
     message: input.message?.trim() || deriveMessage(found.memory.body, input.pattern!, input.absent),
     ...(input.incident?.trim() ? { incident: input.incident.trim() } : {}),
     severity: input.severity,
@@ -739,7 +752,9 @@ export async function proposeSensor(
         `If that code is CORRECT, this warning is noise: tighten the pattern or add an 'absent' companion. ` +
         `If the faulty code is merely still present, fix it, then re-propose at severity "block".`
       : "";
-  const guidance = [firesOnCurrentCaveat, personalScopeNudge.trim()].filter(Boolean).join(" ");
+  const guidance = [firesOnCurrentCaveat, proseSelfMatchCaveat(input.pattern!, input.flags, found.memory.body), personalScopeNudge.trim()]
+    .filter(Boolean)
+    .join(" ");
 
   return {
     accepted: true,
@@ -749,4 +764,36 @@ export async function proposeSensor(
     self_check,
     file_path: found.filePath,
   };
+}
+
+/**
+ * Does the candidate pattern match the PROSE of the memory it guards?
+ *
+ * Field report 2026-09-04 §3.1: a colour-token sensor blocked the CSS comment that explained the
+ * very rule it enforces, and the contradiction was visible three days earlier — the memory body
+ * already contained the forbidden class names. So it is worth saying out loud at proposal time.
+ *
+ * It is a CAVEAT, not a rejection: documenting a rule almost always means quoting what it forbids,
+ * so refusing on a self-match would refuse nearly every well-written sensor. The engine's own
+ * defences (comments are blanked before matching, documentation files are out of scope unless named
+ * exactly) are what make the self-match harmless — this note tells the author which of them is
+ * carrying the sensor, so they notice when neither applies.
+ */
+function proseSelfMatchCaveat(pattern: string, flags: string | undefined, body: string): string {
+  let re: RegExp;
+  try {
+    re = new RegExp(pattern, [...new Set(["m", ...(flags ?? "").split("")])].filter(Boolean).join(""));
+  } catch {
+    return "";
+  }
+  const hit = body.split("\n").find((line) => { re.lastIndex = 0; return re.test(line); });
+  if (!hit) return "";
+  return (
+    `Note: the pattern also matches this memory's own prose (“${hit.trim().slice(0, 80)}”). ` +
+    "That is normal — a rule usually names what it forbids — and it is harmless because comments are " +
+    "blanked before matching and documentation files are only scanned when a sensor names them exactly. " +
+    "But it means any code comment or docstring quoting the rule is one engine change away from being " +
+    "flagged: keep the pattern anchored to a code-only shape (a call, an assignment, an attribute) " +
+    "rather than to a bare word."
+  );
 }

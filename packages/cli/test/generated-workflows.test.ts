@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { renderCiEnforcementWorkflow } from "../src/commands/enforce.js";
-import { CI_WORKFLOW } from "../src/commands/init.js";
+import { CI_WORKFLOW, renderCiSyncWorkflow } from "../src/commands/init.js";
 
 /**
  * Every workflow `hivelore init` / `hivelore enforce install` writes into a user's repo MUST parse.
@@ -57,5 +57,27 @@ describe("generated GitHub Actions workflows", () => {
     expect(enforcement).toContain("hivelore stats receipt --since 7d --comment");
     // A program embedded in YAML is the defect class itself — keep it out for good.
     expect(enforcement).not.toContain("jq -nr");
+  });
+
+  // Field report 2026-09-04 §4.3: the sync job ran only on main/master, so in a gitflow repo two
+  // blocking sensors sat in `.ai/memories/` for six days without ever reaching CLAUDE.md — rules
+  // that failed commits, invisible to every agent expected to obey them. And `sync` alone was never
+  // going to fix it: the breadcrumbs are written by `bridges sync`, which nothing called.
+  describe("hivelore-sync.yml reaches the branches a repo actually integrates on", () => {
+    it("triggers on the integration branches it was rendered for", () => {
+      const gitflow = parse(renderCiSyncWorkflow(["main", "develop"])) as { on?: { push?: { branches?: string[] } } };
+      expect(gitflow.on?.push?.branches).toEqual(["main", "develop"]);
+    });
+
+    it("runs PR checks on every target branch, not just main", () => {
+      const doc = parse(CI_WORKFLOW) as { on?: Record<string, unknown> };
+      expect(doc.on).toHaveProperty("pull_request");
+      expect(doc.on!.pull_request ?? null).toBeNull();
+    });
+
+    it("refreshes the agent breadcrumbs, not only .ai/", () => {
+      expect(CI_WORKFLOW).toContain("hivelore sync --since HEAD~1");
+      expect(CI_WORKFLOW).toContain("hivelore bridges sync");
+    });
   });
 });

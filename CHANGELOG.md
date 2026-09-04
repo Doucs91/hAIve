@@ -6,6 +6,82 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.60.0] — Scope, exceptions, and a gate you can actually pass
+
+Continues the 2026-09-02 and 2026-09-04 field reports where 0.59.0 stopped. That release fixed what
+the breadcrumb *contained*; this one fixes what the gate *does* — the two reports agree that the
+damage is no longer missing features but rules that fire where they shouldn't and gates that cannot
+be passed, both of which teach agents to ignore enforcement wholesale.
+
+### Sensors get a scope (09-02 §3.2, 09-04 §3.1)
+
+- **`sensor.exclude`** — a per-sensor negation list `paths` could not express. A production-only
+  lesson (`no any`) keeps `paths: ['**']` and adds `exclude: ['**/*.test.*', '**/__tests__/**', …]`
+  instead of being narrowed file by file. A lesson that IS about tests leaves it empty and still
+  fires there. `propose_sensor` takes it and documents when to set it.
+- **Documentation files are out of scope for content sensors.** A `.md`/`.rst`/`.adoc` reached
+  through a wildcard or prefix scope is never matched — example code in prose does not ship. A
+  sensor that names the doc file exactly still fires on it, so an intentional doc rule works.
+
+### Sensors get an exception mechanism (09-04 §3.1)
+
+- **`// hivelore:allow <memory-id> — <reason>`** waives one line for one sensor. Before this, a false
+  positive had exactly two outlets: rewrite correct code, or delete the rule — and "a linter with no
+  exception mechanism ends up disabled" costs the whole rule rather than the one line. The waiver is
+  end-of-line only (a waiver on the preceding line silently covers the next one, which is how a
+  one-off becomes a blanket suppression), requires a reason, and must name the rule it excuses.
+  Every use is reported as a `sensor-waived` finding, so the exception stays auditable — and the
+  block message and the `CLAUDE.md` hard-rules block both tell agents it exists.
+- **`propose_sensor` now says when a pattern matches its own memory's prose** — the 09-04 false
+  positive was detectable three days before it fired. It is a caveat, not a rejection: documenting a
+  rule normally means quoting what it forbids.
+
+### `enforce finish` stops blocking on what it does not own (09-02 §3.3, 09-04 §5)
+
+The exit gate mixed three natures of check and blocked on all of them. Only knowledge blocks now:
+
+- **`bootstrap-incomplete` no longer blocks `finish`** (warns instead). Bootstrapping a repo is a
+  project, not a precondition for finishing one bugfix — and its prescribed fix is an MCP prompt,
+  unreachable in exactly the sessions where the MCP layer is down. It made the gate unpassable for
+  entire sessions, which also discredited `github-actions-pass`, the one check catching a real agent
+  defect.
+- **A CI run that failed only on infrastructure steps** (artifact upload over the account's storage
+  quota, cache, toolchain setup) is a warning, not a blocker. The build and the tests ran and passed;
+  a knowledge tool has no business gating on someone's billing state. Classified from which STEPS
+  failed — no log download — and any doubt keeps the gate blocking.
+- **Untracked-only worktrees warn instead of blocking.** Nothing tracked was modified, so no work is
+  at risk — and the untracked files were routinely the memories `mem_save` had just written, the tool
+  manufacturing its own blocker. Real uncommitted work still blocks.
+
+### Generated workflows reach the branches repos actually use (09-04 §4.3)
+
+- **`hivelore-sync.yml` push triggers are rendered from the repo's own integration branches**
+  (`main`/`master`/`develop`, detected at `init`), not hardcoded to `main`/`master`. In a gitflow
+  repo the sync job simply never ran: two blocking sensors lived in `.ai/memories/` for six days
+  without ever reaching `CLAUDE.md` — rules that failed commits, invisible to every agent expected
+  to obey them.
+- **The workflow now calls `hivelore bridges sync`.** `sync` only touches `.ai/`; the breadcrumbs
+  agents actually read are written by `bridges sync`, which was called nowhere. Both are covered by
+  the generated-workflow regression tests.
+
+### The `haive` → `hivelore` rename is finally swept (09-04 §7.5)
+
+Reported three times as a repo bug, because the repo is where everyone looked — `hivelore init` has
+always written a correct project `.mcp.json`. The failing entry lives in the USER-scope client config
+(`~/.claude.json` and friends), survives reinstalls, and fails with `ENOENT: haive-mcp` at the start
+of every session in every project.
+
+- **`hivelore doctor` detects it; `--fix` removes it.** Only entries whose command is the dead binary
+  are touched.
+- **A stale `haive` key no longer counts as "already configured"** — that check was why setup skipped
+  writing the working entry, keeping the broken one alive.
+
+### Quieter gate (09-02 §3.4)
+
+- `briefing-missing` and `bootstrap-incomplete` join the standing-state codes hidden from the
+  interactive gate (still in doctor/CI/`--explain`). They never blocked and printed identically on
+  all ~20 commits of a session — the mechanism by which a tool's output stops being read.
+
 ## [0.59.0] — Rank the breadcrumb, finish the comment fix, stop breaking git
 
 The 09-02 and 09-04 field reports converged: the one artefact that delivers value — the memory block

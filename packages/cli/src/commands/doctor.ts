@@ -10,6 +10,7 @@ import {
 } from "../utils/autopilot.js";
 import { lintMemoriesAsync } from "./memory-lint.js";
 import { detectStaleGitHooks, repairStaleGitHooks } from "./enforce.js";
+import { detectLegacyUserScopeMcpEntries, sweepLegacyUserScopeMcpEntries } from "./init-mcp-setup.js";
 import { isSyntheticSuggestionQuery } from "./memory-suggest.js";
 
 declare const __HAIVE_VERSION__: string;
@@ -159,6 +160,38 @@ export function registerDoctor(program: Command): void {
               code: "stale-git-hook",
               message: `${staleHooks.length} git hook(s) are broken (${staleHooks.join(", ")}): they call the removed \`haive\` binary or carry a duplicate block, so every commit fails with \`haive: not found\`.`,
               fix: "hivelore doctor --fix   # or: hivelore enforce install",
+            });
+          }
+        }
+      }
+
+      // ── First-run health: legacy MCP entry in the USER-scope client config ─
+      // The `haive` → `hivelore` rename left a global entry pointing at a binary that no longer
+      // exists. It is invisible from the repo (the project `.mcp.json` is correct), survives
+      // reinstalls, and fails with `ENOENT: haive-mcp` at the start of every session in EVERY
+      // project — which reads as "Hivelore is unavailable" when it is in fact working. Reported
+      // three times as a repo bug because that is where everyone looked (field report 2026-09-04
+      // §7.5). Only entries whose command is the dead binary are touched.
+      {
+        const legacy = await detectLegacyUserScopeMcpEntries();
+        if (legacy.length > 0) {
+          if (opts.fix && !opts.dryRun) {
+            const swept = await sweepLegacyUserScopeMcpEntries();
+            const cleaned = swept.filter((r) => r.removed.length > 0);
+            if (cleaned.length > 0) {
+              findings.push({
+                severity: "info",
+                code: "legacy-mcp-entry-removed",
+                alwaysShow: true,
+                message: `Removed the stale \`haive\` MCP entry from ${cleaned.map((r) => r.path).join(", ")} — it pointed at the removed binary and failed on every session start.`,
+              });
+            }
+          } else {
+            findings.push({
+              severity: "warn",
+              code: "legacy-mcp-entry",
+              message: `A stale \`haive\` MCP entry in ${legacy.map((r) => r.path).join(", ")} points at the removed binary; it fails with \`ENOENT: haive-mcp\` at every session start, in every project.`,
+              fix: "hivelore doctor --fix",
             });
           }
         }

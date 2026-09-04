@@ -84,23 +84,43 @@ function normalizeProjectPath(value: string): string {
  * Does this sensor apply to `path`? A sensor with no explicit `paths` (and whose
  * memory has no anchor paths) applies everywhere. Otherwise it applies to the exact
  * file, a directory prefix, or a glob (`**` / `*.controller.ts` style) scope.
+ *
+ * Two guards keep a rule from firing where it can only be a false positive: an explicit `exclude`
+ * glob list (a production-only lesson skips its own test doubles), and a built-in skip of
+ * DOCUMENTATION files for content sensors — example code in a `.md`/`.rst` is never shipped, so a
+ * regex/ast match there is always wrong unless the sensor names that exact file.
  */
 export function sensorAppliesToPath(
   sensor: Sensor,
   anchorPaths: string[],
   path: string,
 ): boolean {
-  const scopes = sensor.paths.length > 0 ? sensor.paths : anchorPaths;
-  if (scopes.length === 0) return true;
   const target = normalizeProjectPath(path);
-  return scopes.some((rawScope) => {
+  const matchesScope = (rawScope: string): boolean => {
     const scope = normalizeProjectPath(rawScope);
     if (!scope) return false;
-    // Glob scopes (stack packs ship `**/*.controller.ts`-style sensors) were silently dead
-    // under pure prefix matching — every glob-scoped sensor never fired anywhere.
     if (isGlobPath(scope)) return globToRegExp(scope).test(target);
     return target === scope || target.startsWith(`${scope}/`);
-  });
+  };
+  // An explicit exclusion always wins — this is the per-sensor negation `paths` cannot express.
+  if (sensor.exclude?.some(matchesScope)) return false;
+  const scopes = sensor.paths.length > 0 ? sensor.paths : anchorPaths;
+  // A content sensor never fires on a documentation file reached via a wildcard/prefix scope; it may
+  // only fire on a doc the sensor names EXACTLY (so an intentional doc rule still works).
+  if ((sensor.kind === "regex" || sensor.kind === "ast") && isDocumentationPath(target)) {
+    return scopes.map(normalizeProjectPath).includes(target);
+  }
+  if (scopes.length === 0) return true;
+  return scopes.some(matchesScope);
+}
+
+const DOCUMENTATION_EXTENSIONS = new Set(["md", "mdx", "markdown", "rst", "txt", "adoc"]);
+
+/** True for prose/documentation files that ship as docs, not executable code. */
+function isDocumentationPath(target: string): boolean {
+  const base = target.split("/").pop() ?? "";
+  const dot = base.lastIndexOf(".");
+  return dot >= 0 && DOCUMENTATION_EXTENSIONS.has(base.slice(dot + 1).toLowerCase());
 }
 
 /**
@@ -261,13 +281,54 @@ export function stripCommentsForScan(content: string, path: string): string {
 }
 
 /**
+ * An inline waiver a developer wrote to excuse ONE line from ONE sensor, recorded so the exception
+ * is auditable rather than silent. Field report 2026-09-04 §3.1: a false positive had no outlet
+ * other than rewriting correct code or deleting the sensor — and "a linter with no exception
+ * mechanism ends up disabled", which costs the whole rule, not one line.
+ */
+export interface SensorWaiver {
+  memory_id: string;
+  /** Project-relative file the waiver was used in. */
+  file?: string;
+  /** The waived line, trimmed and capped. */
+  line: string;
+  /** The reason the author gave after the slug. Never empty — a reasonless waiver does not apply. */
+  reason: string;
+}
+
+/**
+ * Does a `hivelore:allow` waiver on (or just above) this line excuse THIS sensor?
+ *
+ * Syntax, written in a comment: `hivelore:allow <slug> — why this line is fine`. The slug must
+ * identify the memory (a substring of its id), so a waiver is never a blanket suppression of every
+ * sensor on the line, and the reason is mandatory — an unexplained exception is the thing that lets
+ * a rule quietly rot. Read from the RAW line: the marker lives in a comment, which the scan text
+ * has already blanked.
+ */
+const WAIVER_MARKER = /hivelore:allow\s+([A-Za-z0-9._/-]+)(?=\s|$)\s*[—–:-]*\s*(.*)$/i;
+
+export function sensorWaiverOnLine(memoryId: string, rawLine: string): string | null {
+  const m = WAIVER_MARKER.exec(rawLine);
+  if (!m) return null;
+  const slug = (m[1] ?? "").toLowerCase();
+  // Strip a trailing comment closer (`*/`, `-->`) so a block-comment waiver keeps a clean reason.
+  const reason = (m[2] ?? "").replace(/(?:\*\/|-->|#>)\s*$/, "").trim();
+  if (!slug || !reason) return null;
+  const id = memoryId.toLowerCase();
+  if (id !== slug && !id.includes(slug)) return null;
+  return reason;
+}
+
+/**
  * Run a single regex sensor over one target. Returns the first matching line as a hit,
- * or null. Deterministic and side-effect-free.
+ * or null. Deterministic and side-effect-free — waivers found along the way are pushed into the
+ * optional `waivers` sink so the caller can journal them (the exception stays visible).
  */
 export function runRegexSensor(
   memoryId: string,
   sensor: Sensor,
   target: SensorTarget,
+  waivers?: SensorWaiver[],
 ): SensorHit | null {
   const re = compileRegexSensor(sensor);
   if (!re) return null;
@@ -292,6 +353,21 @@ export function runRegexSensor(
       const to = Math.min(scanLines.length, i + SENSOR_ABSENT_WINDOW + 1);
       absentRe.lastIndex = 0;
       if (absentRe.test(scanLines.slice(from, to).join("\n"))) continue;
+    }
+
+    // Inline waiver: the author already judged this occurrence and said why. Honour it and keep
+    // scanning — a waiver excuses THIS line and nothing else. Deliberately end-of-line only: a
+    // waiver read from the preceding line silently covers the line after it too, which is how a
+    // one-off exception quietly becomes a disabled rule.
+    const waivedReason = sensorWaiverOnLine(memoryId, rawLine);
+    if (waivedReason) {
+      waivers?.push({
+        memory_id: memoryId,
+        file: target.path,
+        line: rawLine.trim().slice(0, 200),
+        reason: waivedReason,
+      });
+      continue;
     }
 
     // A brittle pattern (hardcoded line numbers, etc.) must never hard-block, even if a human
@@ -320,6 +396,7 @@ export function runRegexSensor(
 export function runSensors(
   memories: Memory[],
   targets: SensorTarget[],
+  waivers?: SensorWaiver[],
 ): SensorHit[] {
   const hits: SensorHit[] = [];
   for (const memory of memories) {
@@ -331,7 +408,7 @@ export function runSensors(
     const anchorPaths = memory.frontmatter.anchor.paths;
     for (const target of targets) {
       if (!sensorAppliesToPath(sensor, anchorPaths, target.path)) continue;
-      const hit = runRegexSensor(memory.frontmatter.id, sensor, target);
+      const hit = runRegexSensor(memory.frontmatter.id, sensor, target, waivers);
       if (hit) hits.push(hit);
     }
   }
