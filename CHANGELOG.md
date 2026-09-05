@@ -6,6 +6,32 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.61.1] — The per-tool-call hooks cost 2 s each for nothing
+
+Two independent field reports on 2026-09-05 (§3 and §7) measured the same thing from two different
+seats: `hivelore enforce pre-tool-use` and `hivelore observe` each took ~2.3 s per invocation, on a
+trivial payload, with `user` time of 0.29 s. Both hooks run on **every** `Edit`, `Write` and `Bash`,
+so an ordinary session of 200-300 tool calls paid **15 to 20 minutes of pure waiting**, in two-second
+slices nobody notices one at a time.
+
+It was not Node startup and not corpus loading. `readStdin` armed a 2 s hard cap
+(`setTimeout(finish, 2000)`) so a stuck hook could never block Claude — but never cleared it. The
+payload was read in milliseconds; the timer then held the event loop open for the remaining ~2 s
+before the process could exit. The hard cap is still there, now cleared on finish and `unref`'d, so
+it protects against a stuck stdin without charging every healthy call for it.
+
+Measured on the same machine as the reports, same command, same payload:
+
+| Hook | Before | After |
+|---|---:|---:|
+| `hivelore enforce pre-tool-use` | 2.39 s | **0.27 s** |
+| `hivelore observe` | 2.38 s | **0.26 s** |
+
+≈ 4.7 s per tool call becomes ≈ 0.53 s — a 9× cut, and the 15-20 minutes per session goes away
+without removing a hook, narrowing a matcher, or changing what either hook does. `test/hook-latency.test.ts`
+spawns both hooks and fails if either takes more than 1.5 s to exit, so the leak cannot come back
+unseen.
+
 ## [0.61.0] — Remove the knowledge-layer health score
 
 Asked for by three consecutive field reports (2026-09-01, 09-02 §3.5, 09-04 §6), each saying the same

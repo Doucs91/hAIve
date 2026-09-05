@@ -3576,9 +3576,11 @@ async function readStdin(maxBytes: number): Promise<string> {
     const chunks: Buffer[] = [];
     let total = 0;
     let done = false;
+    let cap: NodeJS.Timeout | undefined;
     const finish = (): void => {
       if (done) return;
       done = true;
+      if (cap) clearTimeout(cap);
       resolve(Buffer.concat(chunks).toString("utf8"));
     };
     process.stdin.on("data", (c: Buffer) => {
@@ -3592,7 +3594,11 @@ async function readStdin(maxBytes: number): Promise<string> {
     });
     process.stdin.on("end", finish);
     process.stdin.on("error", finish);
-    setTimeout(finish, 2000);
+    // Hard cap so a stuck hook never blocks Claude. The timer is cleared on finish AND
+    // unref'd: an un-cleared 2 s timer keeps the event loop alive and made every hook
+    // invocation cost ~2 s of pure waiting after the payload had already been read.
+    cap = setTimeout(finish, 2000);
+    cap.unref();
   });
 }
 

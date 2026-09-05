@@ -1,6 +1,6 @@
 {
   "name": "@hivelore/mcp",
-  "version": "0.61.0",
+  "version": "0.61.1",
   "mcpName": "io.github.Doucs91/hivelore",
   "description": "Hivelore MCP server - policy-aware briefing and memory tools for coding-agent harnesses",
   "license": "Apache-2.0",
