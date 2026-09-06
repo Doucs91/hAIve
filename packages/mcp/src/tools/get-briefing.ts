@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import { readFile, writeFile, readdir } from "node:fs/promises";
+import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
@@ -222,6 +224,24 @@ export async function getBriefing(
     if (recaps.length > 0) {
       const r = recaps[0]!;
       const fm = r.memory.frontmatter;
+      // Date it, and expire it. A recap is a claim about the CURRENT state of the project, and it
+      // decays: the one in field report 2026-09-05 §4 was eight days and thirty PRs old, described
+      // a product name that had since been decided and a payment integration that had since
+      // shipped, and was printed — undated — as the first thing every session read. Past the
+      // staleness bar the body is replaced by what git can still prove.
+      // `verified_at` is stamped on every topic upsert, so it is the freshest evidence of when the
+      // recap last described reality; `created_at` survives upserts unchanged and would age a recap
+      // that is in fact rewritten daily.
+      const asOf = fm.verified_at ?? fm.created_at;
+      const asOfMs = Date.parse(asOf ?? "");
+      const ageDays = Number.isFinite(asOfMs)
+        ? Math.max(0, Math.round((Date.now() - asOfMs) / 86_400_000))
+        : undefined;
+      const commitsSince = Number.isFinite(asOfMs) ? await countCommitsSince(ctx.paths.root, asOf!) : null;
+      const stale =
+        (ageDays !== undefined && ageDays > RECAP_STALE_DAYS) ||
+        (commitsSince !== null && commitsSince > RECAP_STALE_COMMITS);
+      const recent = stale ? await recentCommitSubjects(ctx.paths.root) : [];
       lastSession = {
         id: fm.id,
         scope: fm.scope,
@@ -229,7 +249,16 @@ export async function getBriefing(
         // The briefing head carries only what the next session must act on — goal + next steps.
         // The full recap stays in the corpus, reachable with mem_get, instead of being re-emitted
         // in full (~3000 tokens) at the top of every briefing (field report 2026-09-01 §5.6).
-        body: recapBriefingExcerpt(r.memory.body),
+        body: stale
+          ? `_No recent session recap — the last one (\`${fm.id}\`) is ${ageDays ?? "?"} day(s) and ` +
+            `${commitsSince ?? "?"} commit(s) old, too stale to describe the project's current state. ` +
+            `Read it with mem_get if you want the history._` +
+            (recent.length > 0 ? `\n\n**Latest activity (git):**\n${recent.map((c) => `- ${c}`).join("\n")}` : "")
+          : recapBriefingExcerpt(r.memory.body),
+        ...(asOf ? { as_of: asOf } : {}),
+        ...(ageDays !== undefined ? { age_days: ageDays } : {}),
+        commits_since: commitsSince,
+        stale,
       };
     }
 
@@ -1118,4 +1147,35 @@ function oneLine(value: string): string {
 declare const __HAIVE_VERSION__: string;
 function serverVersion(): string {
   return typeof __HAIVE_VERSION__ === "string" ? __HAIVE_VERSION__ : "dev";
+}
+
+/**
+ * Staleness bar for a session recap. Either limit alone is too blunt: a week of no work leaves an
+ * accurate recap accurate, and thirty PRs in two days leave a one-day-old recap describing a
+ * different project. Whichever trips first wins.
+ */
+const RECAP_STALE_DAYS = 7;
+const RECAP_STALE_COMMITS = 25;
+
+const runGit = promisify(execFile);
+
+/** Commits on HEAD since an ISO timestamp. Null when git cannot answer (no repo, no history). */
+async function countCommitsSince(root: string, isoDate: string): Promise<number | null> {
+  try {
+    const { stdout } = await runGit("git", ["rev-list", "--count", `--since=${isoDate}`, "HEAD"], { cwd: root });
+    const n = Number.parseInt(stdout.trim(), 10);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The five most recent commit subjects — always true, free, and enough as a safety net. */
+async function recentCommitSubjects(root: string, limit = 5): Promise<string[]> {
+  try {
+    const { stdout } = await runGit("git", ["log", `-${limit}`, "--format=%ad %s", "--date=short"], { cwd: root });
+    return stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
 }

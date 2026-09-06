@@ -6,6 +6,105 @@ project follows semantic versioning once it ships its first stable release.
 
 ## [Unreleased]
 
+## [0.62.0] — Everything the two 2026-09-05 field reports asked for
+
+Two agents wrote independent reports the same day, from opposite seats — one reviewing and writing
+the task sheets, one executing them — and agreed on more than they disagreed. This release works
+through their combined list. Nothing here removes a capability; every item removes noise, time, or a
+false assurance.
+
+### `enforce check` no longer reports a green it never evaluated
+
+`--stage local` — the stage the generated `CLAUDE.md` tells every agent to run before its final
+response — skipped the anti-pattern + sensor diff scan and still printed `✓ gate passed`. It was
+visible only in `--json`, as an `info` among six green lines. Twelve PR descriptions in one report
+and eight in the other carried "hivelore enforce check: 0 issues" as a guarantee covering the one
+check that differentiates the product, which that stage had never run.
+
+`local` now scans the worktree diff (`git diff HEAD` — staged AND unstaged, because an agent asks
+before it stages) with the same rules the commit hook uses, so what the agent is told matches what
+will happen at commit. Evaluations from a preview are logged to the sensor ledger as `manual`, never
+as `pre-commit`, so prevention statistics stay honest. Where a scan genuinely is deferred — pre-push,
+whose commits were each scanned as they were made — the pass line now says
+`… 0 issue(s), 1 deferred (antipattern-gate)` instead of a bare "passed".
+
+### `briefing-loaded` says whose briefing it found
+
+The strict `requireBriefingFirst` check asked "does any marker in the directory fall inside the 12 h
+TTL". An agent that never called `get_briefing` once across eight PRs passed it eight times, on a
+marker another session had left at 23:58 the night before. The finding now names the marker's
+provenance and age — `briefing-loaded` for this session, `briefing-marker-present` (with "this check
+confirms a marker, not that the current agent read anything") for someone else's — and
+`requireBriefingFirst: "session"` makes the strict reading actually strict. `enforce check --session`
+plus `$HIVELORE_SESSION_ID` / `$HAIVE_SESSION_ID` / `$CLAUDE_SESSION_ID` give the CLI a session to
+scope to.
+
+### `hivelore sensors coverage` — where a rule can be broken with the gate silent
+
+A "no hardcoded credentials, even in tests" sensor was scoped to `frontend/src, backend/src/test/java`
+while the secret went into `docker-compose.yml`. GitGuardian caught what the corpus had described
+nine days earlier: the right rule, the right file and the right moment all existed, and the scope
+kept them apart. A sensor scope should follow the INTENT of the rule, not the directory where the
+mistake was first seen — a scope that is too narrow is worse than no sensor, because it reads as
+coverage.
+
+The new command runs every regex sensor's own pattern against the whole tracked tree and lists the
+matches its scope excludes, widest hole and block sensors first. Documentation is skipped (a content
+sensor can never fire on a doc reached through a scope, so it is never a real hole).
+
+### The session recap is dated, and expires
+
+`## Last session` was printed undated at the top of every session. In one repo it was eight days and
+thirty PRs old, described a product name that had since been decided and a payment integration that
+had since shipped. The briefing now carries `as_of`, `age_days`, `commits_since` and `stale`, the
+header reads `## Last session — 2026-08-27, 8d ago, 30 commit(s) since`, and past 7 days or 25
+commits the stale claim is replaced by the last five commit subjects — always true, free, and enough
+as a safety net. Better nothing than a confident wrong answer.
+
+### `pr-memory-check`: no more comment about the roadmap
+
+- **High-churn files are excluded from matching.** Four of eight PRs matched `docs/roadmap.md` and
+  nothing else — four identical comments, enough for a reviewer to stop reading the block. Files
+  touched by ≥40% of the last 60 commits carry no information in a diff; they are now measured from
+  the repo's own history (never a guessed filename list) and dropped. With too little history to
+  measure, nothing is excluded. When only such files matched, no comment is posted at all.
+- **Matching is on path segments, not string suffixes.** `changeNorm.endsWith(anchorNorm)` matched
+  any two paths sharing a tail, which is how a twenty-line `frontend/public/images/README.md` drew a
+  comment about monorepo version tagging.
+- **Sensors armed on the changed files are listed first** — the memories that can actually refuse the
+  change, which is what would have informed the two PRs the old comment got wrong.
+
+### `finish` stops waiting on things that cannot refuse the change
+
+Six times in one week `finish` blocked on `github-actions-pending` because a SonarQube workflow — not
+a required check — was still running: 5 to 12 minutes each, on pushes whose build, tests and gate had
+all passed. Advisory workflows are now advisory whether they failed or have not finished. And a job
+the runner never started (an exhausted Actions minutes budget stops every job in an account) is
+classified as infrastructure rather than a verdict on the code: reported, never blocking. A run that
+failed with steps that ran and did not fail stays blocking — the ambiguous case fails closed.
+
+### `code-map.json` leaves the git tree
+
+It accounted for 40 of one repo's 88 commits, forced eight `git stash`es in a single day to allow a
+branch switch, and rode into three unrelated feature PRs as a 105/75/25-line diff — a machine-written
+file in a repo whose own convention says "never commit a generated artifact". It now lives in
+`.ai/.cache/code-map.json`. An existing tracked copy is still read, and is deleted on the next write,
+so the migration is one deletion in one commit instead of a file that keeps coming back. `hivelore
+init` adds it to `.gitignore`.
+
+### `pr-eval-gate` stays out of the way until it can fail
+
+Twenty runs, twenty times "score 100/100 · no baseline · regression gate skipped", each paying a cold
+`npm install -g` of the CLI out of the account's Actions minutes. The generated job now checks for
+`.ai/eval/baseline.json` BEFORE installing anything, and says once, as a notice, how to enable it.
+
+### Uncaptured failures are surfaced where the agent can still act
+
+The counter existed and was right — seven hard failures never written down in a session that shipped
+eight PRs — but it only appeared at `finish`, when the agent has stopped working. It now runs at
+pre-push too, and instead of "call `mem_tried`" it hands over a `hivelore memory tried` command
+already filled in with the failure the harness observed.
+
 ## [0.61.1] — The per-tool-call hooks cost 2 s each for nothing
 
 Two independent field reports on 2026-09-05 (§3 and §7) measured the same thing from two different

@@ -1410,6 +1410,70 @@ describe("Hivelore CLI integration", () => {
     }
   });
 
+  it("the default `enforce check` scans the worktree diff instead of reporting a green it never evaluated", async () => {
+    // The stage the generated CLAUDE.md tells every agent to run before its final response used to
+    // skip the sensor scan entirely and still print "gate passed". Twenty PR descriptions carried
+    // that guarantee (field reports 2026-09-05 §2 and §4). The scan must now run on UNSTAGED work
+    // too: the agent asks "is what I just wrote clean?" before it stages anything.
+    const repo = await mkdtemp(path.join(tmpdir(), "haive-local-scan-"));
+    try {
+      await exec("git", ["init"], { cwd: repo });
+      await exec("git", ["config", "user.email", "test@example.com"], { cwd: repo });
+      await exec("git", ["config", "user.name", "Hivelore Test"], { cwd: repo });
+      await mkdir(path.join(repo, "src"), { recursive: true });
+      await writeFile(path.join(repo, "src/status.ts"), "export const status = \"OK\";\n", "utf8");
+      await exec("git", ["add", "."], { cwd: repo });
+      await exec("git", ["commit", "-m", "initial"], { cwd: repo });
+
+      await run(repo, ["init", "--manual", "--no-mcp-setup", "--stack", "none", "--no-bootstrap", "--dir", repo]);
+      await writeFile(
+        path.join(repo, ".ai/memories/team/2026-01-01-attempt-lowercase-status.md"),
+        [
+          "---",
+          "id: 2026-01-01-attempt-lowercase-status",
+          "scope: team",
+          "type: attempt",
+          "status: validated",
+          "created_at: '2026-01-01T00:00:00.000Z'",
+          "anchor:",
+          "  paths: [src/status.ts]",
+          "  symbols: []",
+          "sensor:",
+          "  kind: regex",
+          "  pattern: 'status\\s*=\\s*\"ok\"'",
+          "  message: return uppercase OK/KO",
+          "  severity: block",
+          "  paths: [src/status.ts]",
+          "  last_fired: null",
+          "tags: []",
+          "---",
+          "# lowercase status",
+          "",
+          "Using lowercase status ok failed. Return uppercase OK or KO.",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      await exec("git", ["add", "."], { cwd: repo });
+      await exec("git", ["commit", "--no-verify", "-m", "add lesson"], { cwd: repo });
+
+      // Modified, NOT staged — exactly the state an agent is in when it asks the gate.
+      await writeFile(path.join(repo, "src/status.ts"), "export const status = \"ok\";\n", "utf8");
+
+      const result = await runAllowFailure(repo, ["enforce", "check", "--json", "--dir", repo]);
+      const report = JSON.parse(result.stdout) as {
+        should_block: boolean;
+        findings: Array<{ code: string; severity: string }>;
+      };
+      expect(report.findings.some((f) => f.code === "sensor-block")).toBe(true);
+      expect(report.should_block).toBe(true);
+      // And the stage that genuinely defers a scan must SAY so, not print a bare pass.
+      expect(report.findings.some((f) => f.code === "antipattern-gate-deferred")).toBe(false);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
   it("CI enforcement reconstructs decision coverage without a local briefing marker", async () => {
     const repo = await mkdtemp(path.join(tmpdir(), "haive-ci-decision-coverage-"));
     try {
@@ -1489,7 +1553,7 @@ describe("Hivelore CLI integration", () => {
 
       // A committed map can retain paths from an ignored/nested checkout that is absent in CI.
       // Those stale entries must not manufacture bootstrap areas in the current checkout.
-      const codeMapFile = path.join(repo, ".ai/code-map.json");
+      const codeMapFile = path.join(repo, ".ai/.cache/code-map.json");
       const codeMap = JSON.parse(await readFile(codeMapFile, "utf8")) as { files: Record<string, unknown> };
       const sampleEntry = Object.values(codeMap.files)[0];
       codeMap.files["ignored-ref/a.ts"] = sampleEntry;
@@ -2304,8 +2368,11 @@ describe("Hivelore CLI integration", () => {
       await exec("git", ["add", "."], { cwd: repo });
       await exec("git", ["commit", "-m", "initial"], { cwd: repo });
 
-      // Simulate what `sync` does: regenerate the tracked code-map, leaving it dirty. The tool must
-      // not block `finish` on its OWN artifact.
+      // Simulate what `sync` does: regenerate the code-map, leaving it on disk. Since v0.62.0 it is
+      // written to the gitignored cache, so it is not a worktree change at all — and a repo still
+      // carrying the legacy tracked copy must not be blocked on it either.
+      await mkdir(path.join(repo, ".ai/.cache"), { recursive: true });
+      await writeFile(path.join(repo, ".ai/.cache/code-map.json"), '{"version":1,"files":{"src/x.ts":{"exports":[],"loc":1}}}\n', "utf8");
       await writeFile(path.join(repo, ".ai/code-map.json"), '{"version":1,"files":{"src/x.ts":{"exports":[],"loc":1}}}\n', "utf8");
 
       const result = await runAllowFailure(repo, ["enforce", "finish", "--json", "--dir", repo]);
@@ -2314,7 +2381,6 @@ describe("Hivelore CLI integration", () => {
       };
       const codes = report.findings.map((f) => f.code);
       expect(codes).not.toContain("git-sync-uncommitted-changes");
-      expect(codes).toContain("hivelore-artifact-regenerated");
     } finally {
       await rm(repo, { recursive: true, force: true });
     }

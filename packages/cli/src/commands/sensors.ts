@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { Command } from "commander";
@@ -12,7 +12,9 @@ import {
   assessSensorHealth,
   sensorPromotedAtMap,
   findProjectRoot,
+  findSensorBlindSpots,
   isRetiredMemory,
+  isSensorScannablePath,
   explainSensorRejection,
   judgeProposedSensor,
   loadConfig,
@@ -36,6 +38,7 @@ import {
   scannableSensorTargets,
   serializeMemory,
   withoutQuarantineNote,
+  type SensorTarget,
   type CommandSensorSpec,
   type IncidentHints,
   type Memory,
@@ -154,6 +157,68 @@ export function registerSensors(program: Command): void {
         if (row.last_fired) console.log(`     ${ui.dim("last fired:")} ${row.last_fired}`);
         if (brittle) console.log(`     ${ui.yellow("⚠ brittle:")} ${brittle} — consider rewriting or retiring this sensor`);
       }
+    });
+
+  sensors
+    .command("coverage")
+    .description(
+      "Show where each sensor's rule could be violated but the sensor is not looking — files its own\n" +
+      "  pattern matches that its `paths`/anchor scope excludes. A too-narrow scope reads as coverage.",
+    )
+    .option("--json", "emit JSON", false)
+    .option("--max-files <n>", "cap the number of repository files scanned", "4000")
+    .option("-d, --dir <dir>", "project root")
+    .action(async (opts: { json?: boolean; maxFiles?: string; dir?: string }) => {
+      const root = findProjectRoot(opts.dir);
+      const paths = resolveHaivePaths(root);
+      const memories = await runnableSensorMemories(paths);
+      if (memories.length === 0) {
+        ui.info("No runnable regex sensors — nothing to audit.");
+        return;
+      }
+      const files = await readTrackedTextFiles(root, Number(opts.maxFiles ?? 4000));
+      const blindSpots = findSensorBlindSpots(
+        memories.map((memory) => ({
+          id: memory.frontmatter.id,
+          sensor: memory.frontmatter.sensor!,
+          anchorPaths: memory.frontmatter.anchor.paths,
+        })),
+        files,
+      );
+      if (opts.json) {
+        console.log(JSON.stringify({
+          sensors_audited: memories.length,
+          files_scanned: files.length,
+          blind_spots: blindSpots,
+        }, null, 2));
+        return;
+      }
+      console.log(ui.bold(
+        `Hivelore sensor coverage — ${memories.length} regex sensor(s) against ${files.length} tracked file(s)`,
+      ));
+      if (blindSpots.length === 0) {
+        ui.success("No blind spots: every sensor's scope covers every file its pattern matches.");
+        return;
+      }
+      for (const spot of blindSpots) {
+        const scope = spot.scopes.length > 0 ? spot.scopes.join(", ") : "(repo-wide)";
+        console.log(
+          `\n${spot.severity === "block" ? ui.red("●") : ui.yellow("●")} ${ui.bold(spot.memory_id)} ` +
+          `(${spot.severity}) — ${spot.match_count} file(s) match outside its scope`,
+        );
+        console.log(ui.dim(`    scope: ${scope}`));
+        for (const match of spot.matches) console.log(`    ${match.path}\n      ${ui.dim(match.line)}`);
+        if (spot.match_count > spot.matches.length) {
+          console.log(ui.dim(`    … and ${spot.match_count - spot.matches.length} more`));
+        }
+      }
+      console.log(
+        "\n" + ui.dim(
+          "Each line above is a place the rule can be broken with the gate silent. Widen the scope to the\n" +
+          "rule's intent (`sensor.paths`, with `exclude` for the exceptions), or confirm the file is out of scope\n" +
+          "on purpose. A match here is not automatically a violation — read it before widening.",
+        ),
+      );
     });
 
   sensors
@@ -946,4 +1011,36 @@ function renderGrepScript(rows: Awaited<ReturnType<typeof sensorRows>>): string 
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+/**
+ * Tracked, scannable text files with their contents — the corpus a coverage audit needs.
+ * Binary and oversized files are skipped: a sensor pattern that "matches" a minified bundle or a
+ * PNG is noise, and reading them would dominate the runtime.
+ */
+async function readTrackedTextFiles(root: string, maxFiles: number): Promise<SensorTarget[]> {
+  let listed: string[] = [];
+  try {
+    const { stdout } = await exec("git", ["ls-files", "-z"], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
+    listed = stdout.split("\0").filter(Boolean);
+  } catch {
+    return [];
+  }
+  const MAX_BYTES = 512 * 1024;
+  const out: SensorTarget[] = [];
+  for (const rel of listed) {
+    if (out.length >= maxFiles) break;
+    if (!isSensorScannablePath(rel)) continue;
+    try {
+      const abs = path.resolve(root, rel);
+      const info = await stat(abs);
+      if (!info.isFile() || info.size > MAX_BYTES) continue;
+      const content = await readFile(abs, "utf8");
+      if (content.includes("\0")) continue;
+      out.push({ path: rel, content });
+    } catch {
+      // unreadable / deleted between listing and read — not a coverage question
+    }
+  }
+  return out;
 }

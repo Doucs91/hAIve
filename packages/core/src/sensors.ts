@@ -1039,3 +1039,71 @@ export function addedLinesFromDiff(diff: string): string {
     .map((l) => l.slice(1))
     .join("\n");
 }
+
+/** One place a sensor's rule can be violated that the sensor is not looking at. */
+export interface SensorBlindSpot {
+  memory_id: string;
+  severity: Sensor["severity"];
+  /** The scope actually in force (sensor.paths, else the memory's anchor paths; empty = repo-wide). */
+  scopes: string[];
+  /** Files outside that scope whose content the sensor's own pattern matches. */
+  matches: { path: string; line: string }[];
+  /** Total out-of-scope matching files, even when `matches` is truncated. */
+  match_count: number;
+}
+
+/**
+ * Find, for every regex sensor, the files its OWN pattern matches that its scope excludes.
+ *
+ * Motivated by the case in field report 2026-09-05 §5: a "no hardcoded credentials" sensor scoped
+ * to `frontend/src, backend/src/test/java` while the secret went into `docker-compose.yml`. Every
+ * piece existed — the right rule, the right file, the right moment — and the scope kept them apart,
+ * so a third-party scanner caught what the corpus had described nine days earlier. A sensor's scope
+ * should follow the INTENT of its rule, not the directory where the mistake was first seen; a scope
+ * that is too narrow is more dangerous than no sensor at all, because it reads as coverage.
+ *
+ * Pure: callers supply the file contents. Presence sensors are skipped (they assert a line must
+ * exist, so "matches elsewhere" is meaningless for them) and so are non-regex kinds, which need an
+ * engine or a shell.
+ */
+export function findSensorBlindSpots(
+  sensors: { id: string; sensor: Sensor; anchorPaths: string[] }[],
+  files: SensorTarget[],
+  opts: { maxPerSensor?: number } = {},
+): SensorBlindSpot[] {
+  const maxPerSensor = opts.maxPerSensor ?? 5;
+  const out: SensorBlindSpot[] = [];
+  for (const { id, sensor, anchorPaths } of sensors) {
+    if (sensor.kind !== "regex" || sensor.require_present) continue;
+    if (!compileRegexSensor(sensor)) continue;
+    const matches: { path: string; line: string }[] = [];
+    let matchCount = 0;
+    for (const file of files) {
+      if (!isSensorScannablePath(file.path)) continue;
+      // A documentation file can only ever fire a content sensor that names it EXACTLY (see
+      // sensorAppliesToPath), so widening a scope would not start catching it. Reporting one as a
+      // blind spot sends the reader to fix a hole that cannot exist — the rule's own prose quoting
+      // the pattern it forbids is the usual match.
+      if (isDocumentationPath(file.path)) continue;
+      if (sensorAppliesToPath(sensor, anchorPaths, file.path)) continue;
+      const hit = runRegexSensor(id, sensor, file);
+      if (!hit) continue;
+      matchCount++;
+      if (matches.length < maxPerSensor) {
+        matches.push({ path: file.path, line: (hit.matched_line ?? "").trim().slice(0, 200) });
+      }
+    }
+    if (matchCount === 0) continue;
+    out.push({
+      memory_id: id,
+      severity: sensor.severity,
+      scopes: sensor.paths.length > 0 ? [...sensor.paths] : [...anchorPaths],
+      matches,
+      match_count: matchCount,
+    });
+  }
+  // Widest hole first: a block sensor blind to many files is the most misleading kind of coverage.
+  return out.sort((a, b) =>
+    (a.severity === b.severity ? 0 : a.severity === "block" ? -1 : 1) || b.match_count - a.match_count,
+  );
+}

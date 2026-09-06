@@ -6,6 +6,7 @@
  *
  * Runs entirely from the checked-out repo — no hivelore CLI needed at runtime.
  */
+import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { getOctokit } from "@actions/github";
@@ -38,6 +39,27 @@ interface Memory {
   requiresHumanApproval: boolean;
   body: string;
   filePath: string;
+  /** Set when the memory carries an executable sensor — i.e. it can BLOCK, not merely advise. */
+  sensor?: { severity: string; message: string };
+}
+
+/**
+ * Pull the sensor's severity/message straight out of the frontmatter text.
+ *
+ * The action deliberately ships its own minimal parser (no workspace dependency), and its nested
+ * handling flattens sub-keys, so the sensor block is read from the raw text instead. Only the two
+ * fields the PR comment shows are extracted — deliberately not a second implementation of the
+ * sensor schema.
+ */
+export function extractSensor(raw: string): { severity: string; message: string } | undefined {
+  const fm = raw.match(/^---\n([\s\S]*?)\n---/);
+  if (!fm) return undefined;
+  const block = fm[1]!.match(/^sensor:\n((?:[ \t]+.*\n?)+)/m);
+  if (!block) return undefined;
+  const severity = block[1]!.match(/^\s+severity:\s*(.+)$/m)?.[1]?.trim().replace(/^['"]|['"]$/g, "");
+  const message = block[1]!.match(/^\s+message:\s*(.+)$/m)?.[1]?.trim().replace(/^['"]|['"]$/g, "");
+  if (!severity && !message) return undefined;
+  return { severity: severity ?? "warn", message: message ?? "" };
 }
 
 function parseFrontmatter(raw: string): { fm: Record<string, unknown>; body: string } {
@@ -171,17 +193,77 @@ function loadMemories(memoriesDir: string): Memory[] {
         requiresHumanApproval: fm["requires_human_approval"] === true,
         body,
         filePath: fp,
+        ...(extractSensor(raw) ? { sensor: extractSensor(raw)! } : {}),
       };
     })
     .filter((m): m is Memory => m !== null);
 }
 
-function pathsOverlap(changeNorm: string, anchorNorm: string): boolean {
-  return (
-    changeNorm === anchorNorm ||
-    changeNorm.endsWith(anchorNorm) ||
-    anchorNorm.endsWith(changeNorm)
-  );
+/**
+ * Does a changed file fall under an anchor path?
+ *
+ * Matching is on PATH SEGMENTS, never on string suffixes. The suffix rule this replaces
+ * (`changeNorm.endsWith(anchorNorm)`) matched any two paths that happened to share a tail, so a
+ * memory anchored on `packages/core/package.json` matched every `package.json` in the repo and a
+ * twenty-line `frontend/public/images/README.md` drew a comment about monorepo version tagging
+ * (field report 2026-09-05 §6, PR #78). One confident wrong match teaches a reviewer to skim the
+ * whole block, including the PRs where it was right.
+ */
+export function pathsOverlap(changeNorm: string, anchorNorm: string): boolean {
+  if (!changeNorm || !anchorNorm) return false;
+  if (changeNorm === anchorNorm) return true;
+  // The anchor names a directory that contains the changed file.
+  if (changeNorm.startsWith(`${anchorNorm}/`)) return true;
+  // The anchor names a file inside a directory the change refers to (rare: directory-valued diffs).
+  if (anchorNorm.startsWith(`${changeNorm}/`)) return true;
+  return false;
+}
+
+/**
+ * Files so frequently touched that their presence in a diff carries no information — a roadmap a
+ * team convention makes every PR update, a CHANGELOG, a version file. Anchoring on one makes the
+ * same memories resurface on every PR: four of eight PRs in field report 2026-09-05 §6 matched
+ * `docs/roadmap.md` and NOTHING else, producing four identical comments. Four repetitions are
+ * enough for a reviewer to stop reading the block.
+ *
+ * Pure, and computed from the repo's own history rather than a guessed filename list — a file is
+ * high-churn here or it is not.
+ */
+export function highChurnPaths(
+  commitFileLists: string[][],
+  opts: { minCommits?: number; threshold?: number } = {},
+): Set<string> {
+  const minCommits = opts.minCommits ?? 20;
+  const threshold = opts.threshold ?? 0.4;
+  const out = new Set<string>();
+  // Too little history to characterise churn: exclude nothing rather than guess. A shallow
+  // checkout must degrade to the old behaviour, never to a silent over-filter.
+  if (commitFileLists.length < minCommits) return out;
+  const counts = new Map<string, number>();
+  for (const files of commitFileLists) {
+    for (const file of new Set(files)) counts.set(file, (counts.get(file) ?? 0) + 1);
+  }
+  for (const [file, count] of counts) {
+    if (count / commitFileLists.length >= threshold) out.add(file);
+  }
+  return out;
+}
+
+/** Per-commit file lists from the checked-out history. Empty when the checkout is shallow. */
+function readCommitFileLists(workspace: string, limit = 60): string[][] {
+  try {
+    const raw = execFileSync(
+      "git",
+      ["log", `-${limit}`, "--no-merges", "--name-only", "--format=%x00"],
+      { cwd: workspace, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+    );
+    return raw
+      .split("\0")
+      .map((chunk) => chunk.split("\n").map((l) => l.trim()).filter(Boolean))
+      .filter((files) => files.length > 0);
+  } catch {
+    return [];
+  }
 }
 
 function anchorTouchesChanges(changedNorm: string[], anchorPaths: string[]): boolean {
@@ -194,8 +276,14 @@ function anchorTouchesChanges(changedNorm: string[], anchorPaths: string[]): boo
   return false;
 }
 
-function memoriesForFiles(memories: Memory[], changedFiles: string[]): Map<string, Memory[]> {
-  const normalizedFiles = changedFiles.map((f) => f.replace(/\\/g, "/"));
+function memoriesForFiles(
+  memories: Memory[],
+  changedFiles: string[],
+  ignoredPaths: ReadonlySet<string> = new Set(),
+): Map<string, Memory[]> {
+  const normalizedFiles = changedFiles
+    .map((f) => f.replace(/\\/g, "/"))
+    .filter((f) => !ignoredPaths.has(f));
   const result = new Map<string, Memory[]>();
 
   for (const file of normalizedFiles) {
@@ -227,6 +315,7 @@ function formatComment(
   allActionRequired: Memory[],
   changedFiles: string[],
   brokenAnchors: Memory[],
+  ignoredPaths: string[] = [],
 ): string {
   const lines: string[] = [COMMENT_MARKER, header, ""];
 
@@ -246,6 +335,28 @@ function formatComment(
       lines.push(`\n</details>\n`);
     }
     lines.push("---\n");
+  }
+
+  // ── Sensors covering the changed files ─────────────────────────────────
+  // The memories that can actually REFUSE this change, named before the advisory ones. In field
+  // report 2026-09-05 §5 the sensor that predicted the incident existed, was in scope of no changed
+  // file, and never appeared here — while ten advisory memories did. Listing what is armed on these
+  // exact files is what makes the block at commit time predictable instead of a surprise.
+  const armed = [...fileMemories.entries()]
+    .flatMap(([file, ms]) => ms.filter((m) => m.sensor).map((m) => ({ file, memory: m })));
+  const armedById = new Map<string, { file: string; memory: Memory }>();
+  for (const entry of armed) if (!armedById.has(entry.memory.id)) armedById.set(entry.memory.id, entry);
+  if (armedById.size > 0) {
+    lines.push(`### 🛡️ Sensors armed on these files
+`);
+    for (const { file, memory } of [...armedById.values()].slice(0, 10)) {
+      const icon = memory.sensor!.severity === "block" ? "⛔" : "⚠️";
+      lines.push(
+        `- ${icon} \`${memory.id}\` (${memory.sensor!.severity}) on \`${file}\`` +
+        (memory.sensor!.message ? ` — ${memory.sensor!.message}` : ""),
+      );
+    }
+    lines.push("");
   }
 
   // ── Broken anchor paths ────────────────────────────────────────────────
@@ -310,6 +421,9 @@ function formatComment(
   );
   lines.push("");
   lines.push(
+    ...(ignoredPaths.length > 0
+      ? [`<sub>Ignored for matching (touched by most PRs): ${ignoredPaths.map((p) => `\`${p}\``).join(", ")}</sub>`, ""]
+      : []),
     `<sub>🧠 Powered by [Hivelore](https://github.com/Doucs91/hivelore) · ${changedFiles.length} file${changedFiles.length > 1 ? "s" : ""} scanned · ${new Date().toUTCString()}</sub>`,
   );
 
@@ -547,7 +661,15 @@ async function main(): Promise<void> {
     );
     const brokenAnchors = collectBrokenAnchors(WORKSPACE, anchorRelated);
 
-    const fileMemories = memoriesForFiles(allMemories, changedFiles);
+    // Drop the files every PR touches before matching: a memory surfaced because the roadmap moved
+    // is noise, and noise on four PRs out of eight costs the reviewer's attention on the four where
+    // the match was real.
+    const churn = highChurnPaths(readCommitFileLists(WORKSPACE));
+    const ignoredHere = changedNorm.filter((f) => churn.has(f));
+    if (ignoredHere.length > 0) {
+      console.log(`Hivelore: ignoring ${ignoredHere.length} high-churn file(s) for matching: ${ignoredHere.join(", ")}`);
+    }
+    const fileMemories = memoriesForFiles(allMemories, changedFiles, churn);
     const allSurfaced = [...fileMemories.values()].flat();
     const uniqueIds = new Set(allSurfaced.map((m) => m.id));
     const actionRequired = allMemories.filter(
@@ -574,6 +696,7 @@ async function main(): Promise<void> {
       actionRequired,
       changedFiles,
       brokenAnchors,
+      ignoredHere,
     );
 
     const [owner, repo] = GH_REPO.split("/") as [string, string];

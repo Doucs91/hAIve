@@ -111,7 +111,12 @@ jobs:
       pull-requests: write
       contents: read
     steps:
+      # Enough history for the action to measure which files EVERY PR touches (a roadmap, a
+      # changelog): those carry no information in a diff and are excluded from memory matching.
+      # With a shallow checkout the measurement is skipped, never guessed.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
 
       - uses: Doucs91/hivelore/packages/github-action@main
         with:

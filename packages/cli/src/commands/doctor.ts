@@ -16,6 +16,7 @@ import { isSyntheticSuggestionQuery } from "./memory-suggest.js";
 declare const __HAIVE_VERSION__: string;
 import {
   codeMapPath,
+  resolveCodeMapFile,
   assessSensorHealth,
   assessBehaviourCoverage,
   renderBehaviourCoverageLine,
@@ -585,7 +586,7 @@ export function registerDoctor(program: Command): void {
           fix: "hivelore index code",
         });
       } else {
-        const cmFile = codeMapPath(paths);
+        const cmFile = resolveCodeMapFile(paths) ?? codeMapPath(paths);
         const cmStat = await stat(cmFile);
         const ageDays = (now - cmStat.mtimeMs) / MS_PER_DAY;
         const indexedCount = Object.keys(codeMap.files).length;

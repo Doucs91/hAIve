@@ -101,7 +101,23 @@ export interface BriefingOutput {
   search_mode: "semantic" | "literal_fallback" | "literal";
   match_quality_note?: string;
   inferred_modules: string[];
-  last_session?: { id: string; scope: string; revision_count: number; body: string };
+  /**
+   * The previous session's recap. `as_of`, `age_days` and `commits_since` are part of the payload,
+   * never optional decoration: a recap presented without its date was read as current state at the
+   * top of every session for eight days after the project had renamed itself and shipped thirty PRs
+   * (field report 2026-09-05 §4). `stale: true` means the recap was too old to be trusted and the
+   * body is now derived from git instead — better nothing than a confident wrong answer.
+   */
+  last_session?: {
+    id: string;
+    scope: string;
+    revision_count: number;
+    body: string;
+    as_of?: string;
+    age_days?: number;
+    commits_since?: number | null;
+    stale?: boolean;
+  };
   project_context: { content: string; truncated: boolean; is_template?: boolean; auto_generated?: boolean; omitted_recent?: boolean } | null;
   module_contexts: Array<{ name: string; content: string; truncated: boolean }>;
   memories: BriefingMemory[];

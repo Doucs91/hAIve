@@ -90,13 +90,14 @@ async function readSessionBriefingMarker(
   paths: HaivePaths,
   sessionId: string,
   ttlMs = BRIEFING_MARKER_TTL_MS,
+  now = Date.now(),
 ): Promise<BriefingMarker | null> {
   const file = briefingMarkerPath(paths, sessionId);
   if (!existsSync(file)) return null;
   try {
     const marker = JSON.parse(await readFile(file, "utf8")) as BriefingMarker;
     const created = Date.parse(marker.created_at);
-    if (!Number.isFinite(created) || Date.now() - created > ttlMs) return null;
+    if (!Number.isFinite(created) || now - created > ttlMs) return null;
     return marker;
   } catch {
     return null;
@@ -132,6 +133,46 @@ export async function hasRecentBriefingMarker(
     }
   }
   return false;
+}
+
+/** Where a briefing marker came from, relative to the session asking about it. */
+export type BriefingMarkerSource = "this-session" | "other-session" | "none";
+
+export interface BriefingMarkerStatus {
+  marker: BriefingMarker | null;
+  source: BriefingMarkerSource;
+  /** Age of the marker in ms, or null when there is none. */
+  age_ms: number | null;
+}
+
+/**
+ * Answer the question the `briefing-loaded` gate actually means to ask: did THIS session load a
+ * briefing?
+ *
+ * `hasRecentBriefingMarker` answers a weaker question — does any marker in the directory fall
+ * inside the TTL — and a field report (2026-09-05 §3) showed what that costs: an agent that never
+ * called `get_briefing` passed a `strict` `requireBriefingFirst` gate eight times, on a marker left
+ * by a previous session at 23:58. The check reported "A recent Hivelore briefing marker exists",
+ * which was true, and which nobody could distinguish from "you are briefed".
+ *
+ * Callers that need the accrued memory set (decision coverage) still want the union across markers;
+ * callers that report a guarantee to a human need this instead.
+ */
+export async function describeBriefingMarker(
+  paths: HaivePaths,
+  sessionId?: string,
+  ttlMs = BRIEFING_MARKER_TTL_MS,
+  now = Date.now(),
+): Promise<BriefingMarkerStatus> {
+  const age = (marker: BriefingMarker): number | null => {
+    const created = Date.parse(marker.created_at);
+    return Number.isFinite(created) ? now - created : null;
+  };
+  const own = await readSessionBriefingMarker(paths, normalizeSessionId(sessionId), ttlMs, now);
+  if (own) return { marker: own, source: "this-session", age_ms: age(own) };
+  const fromAnySession = await readRecentBriefingMarker(paths, sessionId, ttlMs);
+  if (fromAnySession) return { marker: fromAnySession, source: "other-session", age_ms: age(fromAnySession) };
+  return { marker: null, source: "none", age_ms: null };
 }
 
 export async function readRecentBriefingMarker(

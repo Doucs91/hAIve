@@ -5,6 +5,7 @@ import {
   buildCodeMap,
   CODE_MAP_DEFAULT_EXCLUDE,
   codeMapPath,
+  resolveCodeMapFile,
   findProjectRoot,
   loadCodeMap,
   resolveHaivePaths,
@@ -125,13 +126,13 @@ async function reportIndexStatus(
   paths: ReturnType<typeof resolveHaivePaths>,
   asJson: boolean,
 ): Promise<void> {
-  const mapFile = codeMapPath(paths);
-  const map = existsSync(mapFile) ? await loadCodeMap(paths) : null;
+  const mapFile = resolveCodeMapFile(paths);
+  const map = mapFile ? await loadCodeMap(paths) : null;
   const fileCount = map ? Object.keys(map.files).length : 0;
   const exportCount = map
     ? Object.values(map.files).reduce((s, f) => s + f.exports.length, 0)
     : 0;
-  const mapMtime = existsSync(mapFile) ? statSync(mapFile).mtime.toISOString() : null;
+  const mapMtime = mapFile ? statSync(mapFile).mtime.toISOString() : null;
 
   // Code-search embeddings index lives under .ai/.cache/embeddings/ (built by `index code-search`).
   const searchIndexFile = path.join(paths.haiveDir, ".cache", "embeddings", "code-embeddings-index.json");
@@ -155,7 +156,7 @@ async function reportIndexStatus(
   const status = {
     code_map: {
       present: map !== null,
-      path: path.relative(root, mapFile),
+      path: mapFile ? path.relative(root, mapFile) : path.relative(root, codeMapPath(paths)),
       files: fileCount,
       exports: exportCount,
       generated_at: map?.generated_at ?? null,

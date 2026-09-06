@@ -196,8 +196,14 @@ export interface HaiveConfig {
     posture?: "advisory" | "balanced" | "strict";
     /** Enforcement posture: advisory reports only, warn in hooks, or block workflow gates. */
     mode?: "off" | "advisory" | "strict";
-    /** Require get_briefing / mem_relevant_to before state-changing MCP tools. */
-    requireBriefingFirst?: boolean;
+    /**
+     * Require get_briefing / mem_relevant_to before state-changing MCP tools.
+     *   - true (default): a fresh briefing marker must exist. A marker left by ANOTHER session
+     *     satisfies it, and the gate says so explicitly (`briefing-marker-present`).
+     *   - "session": the marker must belong to the CURRENT session — the strict reading.
+     *   - false: off.
+     */
+    requireBriefingFirst?: boolean | "session";
     /**
      * Pre-edit (PreToolUse) behaviour when a file's anchored policy was not yet surfaced:
      *   - "advise" (default): inject the relevant memory content into the agent's context and record

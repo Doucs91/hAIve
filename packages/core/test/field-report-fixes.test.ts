@@ -1,10 +1,12 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   explainSensorRejection,
   judgeProposedSensor,
+  codeMapPath,
   loadCodeMap,
   recordGateReminder,
   renderPreventionComment,
@@ -50,7 +52,7 @@ describe("code-map is versionable (§3.7: 528 KB rewritten on every sync, with a
 
   it("never serializes the absolute root or a per-run timestamp", async () => {
     await saveCodeMap(paths, fakeCodeMap(dir, { "src/a.ts": ENTRY }));
-    const raw = await readFile(path.join(dir, ".ai", "code-map.json"), "utf8");
+    const raw = await readFile(codeMapPath(paths), "utf8");
     // The absolute root was one developer's home directory; no two machines could agree on it.
     expect(raw).not.toContain(dir);
     expect(raw).not.toContain("generated_at");
@@ -65,7 +67,7 @@ describe("code-map is versionable (§3.7: 528 KB rewritten on every sync, with a
   });
 
   it("does not rewrite the file when nothing changed (no diff, so no conflict on pull)", async () => {
-    const file = path.join(dir, ".ai", "code-map.json");
+    const file = codeMapPath(paths);
     await saveCodeMap(paths, fakeCodeMap(dir, { "src/a.ts": ENTRY }));
     const first = await readFile(file, "utf8");
     await writeFile(file, first, "utf8");
@@ -76,6 +78,29 @@ describe("code-map is versionable (§3.7: 528 KB rewritten on every sync, with a
     // A real change still lands.
     await saveCodeMap(paths, fakeCodeMap(dir, { "src/a.ts": ENTRY, "src/c.ts": ENTRY }));
     expect(await readFile(file, "utf8")).not.toBe(first);
+  });
+
+  it("writes to the gitignored cache, not into the tree", async () => {
+    await saveCodeMap(paths, fakeCodeMap(dir, { "src/a.ts": ENTRY }));
+    expect(codeMapPath(paths)).toBe(path.join(dir, ".ai", ".cache", "code-map.json"));
+    expect(existsSync(path.join(dir, ".ai", "code-map.json"))).toBe(false);
+  });
+
+  it("migrates an existing tracked code-map: reads it, then removes it on the next write", async () => {
+    // A repo upgrading from <=0.61 has the map committed at the old path. It must keep working
+    // before the migration, and the tracked copy must disappear exactly once — not keep coming back
+    // in every agent's diff (field report 2026-09-05 §5: 40 of 88 commits).
+    const legacy = path.join(dir, ".ai", "code-map.json");
+    await mkdir(path.dirname(legacy), { recursive: true });
+    await writeFile(legacy, serializeCodeMap(fakeCodeMap(dir, { "src/legacy.ts": ENTRY })), "utf8");
+
+    const beforeMigration = await loadCodeMap(paths);
+    expect(Object.keys(beforeMigration?.files ?? {})).toEqual(["src/legacy.ts"]);
+
+    await saveCodeMap(paths, fakeCodeMap(dir, { "src/legacy.ts": ENTRY }));
+    expect(existsSync(legacy)).toBe(false);
+    expect(existsSync(codeMapPath(paths))).toBe(true);
+    expect(Object.keys((await loadCodeMap(paths))?.files ?? {})).toEqual(["src/legacy.ts"]);
   });
 
   it("still hands consumers a root and a generated_at, so staleness checks keep working", async () => {

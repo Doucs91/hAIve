@@ -35,6 +35,7 @@ sonar-mcp.local.env
 sonar-mcp-ca/
 # Hivelore project-level MCP configs (machine-specific absolute paths)
 .ai/.cache/*
+.ai/code-map.json
 !.ai/.cache/.gitignore
 .ai/.runtime/*
 !.ai/.runtime/.gitignore

@@ -18,6 +18,7 @@ import {
   renderBootstrapChecklist,
   findUncapturedFailures,
   handoffAgeMs,
+  describeBriefingMarker,
   hasRecentBriefingMarker,
   isFreshIsoDate,
   isRetiredMemory,
@@ -132,6 +133,7 @@ interface EnforceOptions {
   sessionId?: string;
   json?: boolean;
   stage?: "local" | "pre-commit" | "pre-push" | "ci";
+  session?: string;
   strict?: boolean;
   claude?: boolean;
   claudeScope?: string;
@@ -288,12 +290,13 @@ export function registerEnforce(program: Command): void {
     .description("Run the Hivelore policy gate. Intended for pre-commit, pre-push, wrappers, and any agent client.")
     .option("-d, --dir <dir>", "project root")
     .option("--stage <stage>", "local | pre-commit | pre-push | ci", "local")
+    .option("--session <id>", "session id to attribute the briefing marker to (default: $HIVELORE_SESSION_ID / $HAIVE_SESSION_ID / $CLAUDE_SESSION_ID)")
     .option("--explain", "group findings by blocking/review/info and show repair commands", false)
     .option("--verbose", "show every check (including the passing ones), not just what needs action", false)
     .option("--json", "emit JSON", false)
     .action(async (opts: EnforceOptions) => {
       const stage = opts.stage ?? "local";
-      const report = await buildEnforcementReport(opts.dir, stage);
+      const report = await buildEnforcementReport(opts.dir, stage, resolveSessionId(opts.session));
       // Compact on the interactive/commit paths; CI, --explain and --verbose keep the full report.
       const quiet = stage !== "ci" && !opts.explain && !opts.verbose;
       printReport(report, Boolean(opts.json), Boolean(opts.explain), quiet);
@@ -438,7 +441,16 @@ export function registerEnforce(program: Command): void {
 
       console.log("Hivelore briefing loaded. Agents must consult this before editing.");
       if (briefing.last_session) {
-        console.log(`\n## Last session\n${briefing.last_session.body.slice(0, 1200)}`);
+        // Never print a recap without its date. Undated, it reads as the current state of the
+        // project — which is how an eight-day-old recap kept telling every new session that a
+        // long-settled naming question was still open (field report 2026-09-05 §4).
+        const ls = briefing.last_session;
+        const age: string[] = [];
+        if (ls.as_of) age.push(ls.as_of.slice(0, 10));
+        if (typeof ls.age_days === "number") age.push(`${ls.age_days}d ago`);
+        if (typeof ls.commits_since === "number") age.push(`${ls.commits_since} commit(s) since`);
+        const header = age.length > 0 ? `## Last session — ${age.join(", ")}` : "## Last session";
+        console.log(`\n${header}${ls.stale ? " ⚠ stale" : ""}\n${ls.body.slice(0, 1200)}`);
       }
       if (briefing.project_context?.content) {
         console.log(`\n## Project context\n${briefing.project_context.content.slice(0, 1800)}`);
@@ -661,10 +673,11 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
   }
 
   const shippableDirty = status.dirtyFiles.filter(isShippablePath);
-  // Hivelore regenerates `.ai/code-map.json` on every sync and it is git-tracked, so a `finish` run
-  // that just refreshed it would block on its OWN artifact ("dirty worktree") — the tool creating
-  // its own blocker (field report §4.4). A deterministic, regenerable index is not the agent's
-  // uncommitted work, so it must not gate the exit. (project-context.md stays in — it is human content.)
+  // Hivelore regenerates `.ai/code-map.json`, so a `finish` run that just refreshed it would block
+  // on its OWN artifact ("dirty worktree") — the tool creating its own blocker (field report §4.4).
+  // Since v0.62.0 the map lives in the gitignored cache and the tracked copy is deleted on the next
+  // write, so this only covers a repo mid-migration: the deletion itself must not gate the exit.
+  // (project-context.md stays in — it is human content.)
   const isHiveloreRegenerated = (f: string): boolean => f === ".ai/code-map.json";
   const regeneratedOnly = status.dirtyFiles.filter(isHiveloreRegenerated);
   const dirtyFiles = status.dirtyFiles.filter((f) => !isHiveloreRegenerated(f));
@@ -711,7 +724,7 @@ async function buildFinishReport(dir: string | undefined): Promise<EnforcementRe
       severity: "info",
       code: "hivelore-artifact-regenerated",
       message: `Ignoring ${regeneratedOnly.length} Hivelore-regenerated artifact(s) left uncommitted: ${regeneratedOnly.join(", ")}.`,
-      fix: "Optional: `git add .ai/code-map.json && git commit` to keep it in sync — it is deterministic and safe to commit.",
+      fix: "`.ai/code-map.json` is no longer tracked (it is regenerated into `.ai/.cache/`). Commit its deletion once: `git rm --cached .ai/code-map.json && git commit`.",
     });
   }
 
@@ -1080,6 +1093,19 @@ async function checkFailureCapture(
       memory.frontmatter.status === "proposed" && memory.frontmatter.tags.includes("auto-captured"),
   );
 
+  // Hand over a filled-in command, not a reminder to go and think. The counter itself is not new —
+  // it counted seven lost lessons in a session that shipped eight PRs — but it only ever appeared at
+  // `finish`, i.e. at the exact moment the agent has stopped working and will not act on it (field
+  // report 2026-09-05 §2.2). Two changes make it land: it now also runs at pre-push, and it arrives
+  // as a draft built from the failure the harness already observed.
+  const draft = uncaptured[0]!;
+  const draftCommand =
+    "hivelore memory tried \\\n" +
+    `  --what ${shellQuote(`${draft.tool}: ${draft.summary}`.slice(0, 120))} \\\n` +
+    "  --why-failed 'the exact error, and the assumption that turned out to be wrong' \\\n" +
+    "  --instead 'what to do instead' \\\n" +
+    "  --scope team";
+
   return [{
     severity: gate === "block" ? "error" : "info",
     code: "uncaptured-failures",
@@ -1090,7 +1116,8 @@ async function checkFailureCapture(
         : ""),
     fix: autoDrafts.length > 0
       ? "Review the auto-captured drafts (`hivelore memory list --status proposed`) — approve, refine, or reject; call `mem_tried` only for failures the drafts missed."
-      : "Call `mem_tried` (or `hivelore memory tried`) for each real failure so the next session doesn't repeat it. False positives (e.g. a grep that found nothing) can be ignored.",
+      : `Start from this draft — the first uncaptured failure, already filled in:\n${draftCommand}\n` +
+        "Repeat for the others (`mem_tried` from MCP does the same). A false positive (a `grep` that found nothing) can be ignored.",
     reason: "Harness ratchet: a mistake that isn't written down gets re-introduced. Set enforcement.failureCaptureGate to 'off' to disable, or 'block' to hard-fail.",
     affected_files: uncaptured.slice(0, 8).map((f) => `${f.tool}: ${f.summary}`.slice(0, 100)),
     ...(gate === "block" ? { impact: 30 } : {}),
@@ -1376,16 +1403,51 @@ async function buildEnforcementReport(
   findings.push(...await checkCorpusReadable(paths));
 
   if (config.enforcement?.requireBriefingFirst !== false && stage !== "ci") {
-    const hasBriefing = await hasRecentBriefingMarker(paths, sessionId);
-    findings.push(hasBriefing
-      ? { severity: "ok", code: "briefing-loaded", message: "A recent Hivelore briefing marker exists." }
-      : {
-          severity: "error",
-          code: "briefing-missing",
-          message: "No recent Hivelore briefing marker was found for this workflow.",
-          fix: "Run `hivelore briefing --task \"...\"`, `hivelore enforce session-start`, or wrap the agent with `hivelore run -- <agent>`.",
-          impact: 35,
-        });
+    // WHOSE briefing, and how old. The old check asked "does any marker in the directory fall
+    // inside the 12 h TTL", answered yes on a marker another session left the previous night, and
+    // printed "A recent Hivelore briefing marker exists" — which a human reading
+    // `requireBriefingFirst: true` reasonably read as "this agent is briefed". It was not: the
+    // agent in field report 2026-09-05 §3 never called get_briefing once across eight PRs. A check
+    // may not promise more than it measures, so the finding now names the marker's provenance and
+    // its age, and `requireBriefingFirst: "session"` makes the strict reading actually strict.
+    const status = await describeBriefingMarker(paths, sessionId);
+    const requireOwn = config.enforcement?.requireBriefingFirst === "session";
+    const ageLabel = status.age_ms !== null ? ` (${formatAge(status.age_ms)} ago)` : "";
+    const memoryCount = status.marker?.memory_ids?.length ?? 0;
+    if (status.source === "this-session") {
+      findings.push({
+        severity: "ok",
+        code: "briefing-loaded",
+        message: `This session loaded a Hivelore briefing${ageLabel}${memoryCount > 0 ? ` — ${memoryCount} memor${memoryCount === 1 ? "y" : "ies"} recorded as consulted` : ""}.`,
+      });
+    } else if (status.source === "other-session") {
+      findings.push(requireOwn
+        ? {
+            severity: "error",
+            code: "briefing-missing-this-session",
+            message:
+              `This session has not loaded a briefing — the only marker${ageLabel} belongs to session ` +
+              `\`${status.marker?.session_id ?? "unknown"}\` (enforcement.requireBriefingFirst="session").`,
+            fix: "Call `get_briefing` (MCP) or run `hivelore briefing --task \"...\"` in this session.",
+            impact: 35,
+          }
+        : {
+            severity: "ok",
+            code: "briefing-marker-present",
+            message:
+              `A briefing marker exists${ageLabel}, from session \`${status.marker?.session_id ?? "unknown"}\` — not this one. ` +
+              "This check confirms a marker, not that the current agent read anything.",
+            fix: 'Set `{ "enforcement": { "requireBriefingFirst": "session" } }` to require a briefing from THIS session.',
+          });
+    } else {
+      findings.push({
+        severity: "error",
+        code: "briefing-missing",
+        message: "No recent Hivelore briefing marker was found for this workflow.",
+        fix: "Run `hivelore briefing --task \"...\"`, `hivelore enforce session-start`, or wrap the agent with `hivelore run -- <agent>`.",
+        impact: 35,
+      });
+    }
   }
 
   if (config.enforcement?.requireSessionRecap !== false && (stage === "pre-push" || stage === "ci")) {
@@ -1421,25 +1483,34 @@ async function buildEnforcementReport(
     findings.push(...await verifyDecisionCoverage(paths, stage, sessionId));
   }
 
-  if (stage === "pre-commit" || stage === "ci") {
+  if (stage === "pre-commit" || stage === "ci" || stage === "local") {
+    // The diff-scan layer (anti-pattern matcher + regex/AST/command sensors) is the ONE
+    // differentiating check of the product, and until v0.62.0 `--stage local` — the stage the
+    // generated CLAUDE.md tells every agent to run before its final response — silently skipped it
+    // and still printed "gate passed". Twenty PR descriptions across two field reports (2026-09-05
+    // §2 and §4) carried a guarantee nobody had evaluated. A preview that omits the only check
+    // worth previewing is not a preview; it is a false green. `local` now scans the worktree diff
+    // with the same rules, so what the agent is told matches what the commit hook will do.
     findings.push(...await runPrecommitPolicy(paths, config.enforcement?.antiPatternGate ?? "anchored", stage, config));
-  } else if (stage === "local") {
-    // The diff-scan layer (anti-pattern matcher + regex/command sensors) runs only at
-    // pre-commit/ci — by design, so a bare `enforce check` preview stays fast and quiet on
-    // config/docs work. Say so explicitly: otherwise a clean `local` run reads as "your diff
-    // passed the sensor gate", which it did not evaluate. The installed git hook uses pre-commit.
+  } else if (stage === "pre-push") {
+    // pre-push has no diff of its own: the commits being pushed were each scanned by the
+    // pre-commit hook as they were made. Say so rather than counting a skipped scan as a pass.
     findings.push({
       severity: "info",
       code: "antipattern-gate-deferred",
-      message:
-        "Anti-pattern + sensor diff scan is NOT evaluated in --stage local (this is a preview). " +
-        "It runs in the installed git hook (--stage pre-commit) and in CI (--stage ci).",
-      fix: "To scan the staged diff now: `hivelore sensors check`, or `hivelore enforce check --stage pre-commit`.",
+      message: "Diff scan not re-run at pre-push — each commit being pushed was scanned at pre-commit; CI re-scans the range.",
+      fix: "To re-scan the whole range now: `hivelore enforce check --stage ci`.",
     });
   }
 
   if (config.enforcement?.cleanupGeneratedArtifacts !== false) {
     findings.push(...await findGeneratedArtifacts(paths));
+  }
+
+  // Ask "what failed?" while the answer is still in the agent's context. At `finish` the session is
+  // over and the prompt lands on someone who has already stopped.
+  if (stage === "pre-push") {
+    findings.push(...await checkFailureCapture(paths, config));
   }
 
   findings.push(
@@ -1749,7 +1820,7 @@ async function verifyDecisionCoverage(
 async function runPrecommitPolicy(
   paths: ReturnType<typeof resolveHaivePaths>,
   gate: AntiPatternGate,
-  stage: "pre-commit" | "ci",
+  stage: PolicyScanStage,
   config: HaiveConfig,
 ): Promise<EnforcementFinding[]> {
   const snapshot = await getPolicyDiffSnapshot(paths.root, stage);
@@ -1790,10 +1861,12 @@ async function runPrecommitPolicy(
   }
   const touchedPaths = snapshot.paths;
   if (touchedPaths.length === 0) {
-    const code = stage === "ci" ? "no-ci-diff-changes" : "no-staged-changes";
+    const code = stage === "ci" ? "no-ci-diff-changes" : stage === "local" ? "no-local-changes" : "no-staged-changes";
     const message = stage === "ci"
       ? "No changed files found for CI policy diff."
-      : "No staged changes found for pre-commit policy.";
+      : stage === "local"
+        ? "No uncommitted changes to scan — nothing in the worktree or the index differs from HEAD."
+        : "No staged changes found for pre-commit policy.";
     return [{ severity: "info", code, message }, ...weakeningFindings];
   }
   // The gate→params mapping lives in @hivelore/core so the git-hook path and the
@@ -1884,7 +1957,7 @@ async function runPrecommitPolicy(
       {
         severity: "ok",
         code: "precommit-policy-pass",
-        message: `${stage === "ci" ? "CI" : "Pre-commit"} policy passed for ${touchedPaths.length} changed file(s).`,
+        message: `${stage === "ci" ? "CI" : stage === "local" ? "Diff-scan" : "Pre-commit"} policy passed for ${touchedPaths.length} changed file(s) (${snapshot.source}).`,
       },
       ...noticeFinding,
       ...reviewFinding,
@@ -1904,7 +1977,7 @@ async function runPrecommitPolicy(
       severity: "error",
       code: "precommit-policy-block",
       message:
-        `Pre-commit policy matched ${result.summary.blocking_warnings ?? result.summary.anti_patterns} blocking anti-pattern(s), ${result.summary.stale_anchors} stale anchor(s)` +
+        `${stage === "local" ? "Diff-scan" : "Pre-commit"} policy matched ${result.summary.blocking_warnings ?? result.summary.anti_patterns} blocking anti-pattern(s), ${result.summary.stale_anchors} stale anchor(s)` +
         (blockingDetail ? `: ${blockingDetail}` : "") +
         (result.stale_anchors.length > 0 ? ` — stale: ${result.stale_anchors.slice(0, 5).map((s) => s.id).join(", ")}` : "") + ".",
       fix: "Review the Hivelore warnings, then update the code or the relevant memories.",
@@ -1934,7 +2007,7 @@ export function parseSensorWeakeningApprovals(text: string | undefined): Set<str
 
 async function resolveSensorWeakeningApprovals(
   root: string,
-  stage: "pre-commit" | "ci",
+  stage: PolicyScanStage,
 ): Promise<Set<string>> {
   const approved = parseSensorWeakeningApprovals(process.env["HIVELORE_SENSOR_WEAKENING_APPROVALS"]);
   if (stage !== "ci") return approved;
@@ -1969,7 +2042,7 @@ async function stagedFileContent(root: string, rel: string): Promise<string | nu
 async function runSensorGate(
   paths: ReturnType<typeof resolveHaivePaths>,
   diff: string,
-  stage: "pre-commit" | "ci",
+  stage: PolicyScanStage,
 ): Promise<EnforcementFinding[]> {
   if (!diff || !existsSync(paths.memoriesDir)) return [];
   try {
@@ -1984,6 +2057,10 @@ async function runSensorGate(
     if (targets.length === 0) return [];
 
     const findings: EnforcementFinding[] = [];
+    // A `local` preview must not be logged as a commit-time evaluation: prevention receipts and
+    // sensor health are counted per stage, and a preview would inflate `pre-commit` with runs that
+    // never guarded a commit. It is the same thing `sensors check` does — a manual evaluation.
+    const ledgerStage: import("@hivelore/core").SensorEvaluationStage = stage === "local" ? "manual" : stage;
     const seen = new Set<string>();
     const firedIds = new Set<string>();
     const ledgerRows = [] as import("@hivelore/core").SensorEvaluation[];
@@ -2016,7 +2093,7 @@ async function runSensorGate(
       ledgerRows.push(evaluation({
         memory_id: memory.frontmatter.id,
         kind: "regex",
-        stage,
+        stage: ledgerStage,
         head_sha: headSha,
         scope_hash: "",
         outcome: hits.some((hit) => hit.memory_id === memory.frontmatter.id) ? "fired" : "silent",
@@ -2078,7 +2155,7 @@ async function runSensorGate(
         ledgerRows.push(evaluation({
           memory_id: memory.frontmatter.id,
           kind: "regex",
-          stage,
+          stage: ledgerStage,
           head_sha: headSha,
           scope_hash: "",
           outcome: presenceHits.some((h) => h.memory_id === memory.frontmatter.id) ? "fired" : "silent",
@@ -2181,7 +2258,7 @@ async function runSensorGate(
           ledgerRows.push(evaluation({
             memory_id: memory.frontmatter.id,
             kind: "ast",
-            stage,
+            stage: ledgerStage,
             head_sha: headSha,
             scope_hash: "",
             outcome: fired ? "fired" : "silent",
@@ -2203,7 +2280,7 @@ async function runSensorGate(
         ledgerRows.push(evaluation({
           memory_id: run.memory_id,
           kind: run.kind,
-          stage,
+          stage: ledgerStage,
           head_sha: headSha,
           scope_hash: await commandScopeHash(paths.root, spec),
           outcome: run.status === "failed" ? "fired" : run.status === "passed" ? "silent" : "unrunnable",
@@ -2282,7 +2359,7 @@ async function runSensorGate(
     if (firedIds.size > 0) {
       const details = Object.fromEntries([...firedIds].map((id) => {
         const row = ledgerRows.find((entry) => entry.memory_id === id && entry.outcome === "fired");
-        return [id, { kind: row?.kind ?? "regex", stage, ...(row?.exit_code !== undefined ? { exit_code: row.exit_code } : {}) }];
+        return [id, { kind: row?.kind ?? "regex", stage: ledgerStage, ...(row?.exit_code !== undefined ? { exit_code: row.exit_code } : {}) }];
       }));
       await recordPreventionHits(paths, [...firedIds], "sensor", new Date(), details)
         .catch(() => { /* best-effort telemetry */ });
@@ -2502,6 +2579,9 @@ async function getChangedFiles(
   return [...files];
 }
 
+/** Stages that scan a diff (anti-pattern matcher + sensors). `pre-push` reuses `pre-commit`. */
+type PolicyScanStage = "local" | "pre-commit" | "ci";
+
 interface PolicyDiffSnapshot {
   diff: string;
   paths: string[];
@@ -2510,8 +2590,21 @@ interface PolicyDiffSnapshot {
 
 async function getPolicyDiffSnapshot(
   root: string,
-  stage: "pre-commit" | "ci",
+  stage: PolicyScanStage,
 ): Promise<PolicyDiffSnapshot> {
+  // `local` is the agent asking "is my work clean?" before it has staged anything, so the scan
+  // covers staged AND unstaged tracked changes (`git diff HEAD`). Scanning only the index here
+  // would reproduce, one step later, the exact false assurance this stage used to give: a green
+  // preview that never looked at the code the agent had just written (field reports 2026-09-05
+  // §2 and §4). Falls back to the index alone on a repo with no commit yet.
+  if (stage === "local") {
+    const diff = await runCommand("git", ["diff", "HEAD"], root).catch(() => "");
+    const names = await runCommand("git", ["diff", "HEAD", "--name-only"], root).catch(() => "");
+    if (diff.trim()) return { diff, paths: normalizeChangedFileList(names), source: "worktree" };
+    const staged = await runCommand("git", ["diff", "--cached"], root).catch(() => "");
+    const stagedNames = await runCommand("git", ["diff", "--cached", "--name-only"], root).catch(() => "");
+    return { diff: staged, paths: normalizeChangedFileList(stagedNames), source: "staged" };
+  }
   if (stage === "pre-commit") {
     const diff = await runCommand("git", ["diff", "--cached"], root).catch(() => "");
     const names = await runCommand("git", ["diff", "--cached", "--name-only"], root).catch(() => "");
@@ -2922,7 +3015,13 @@ async function verifyGithubActionsForHead(
     }];
   }
 
-  const pending = runs.filter((run) => run.status !== "completed");
+  // An advisory workflow is advisory whether it FAILED or has not finished. Blocking `finish` while
+  // a non-required external scanner is still running cost 5-12 minutes six times in one week, on
+  // pushes whose build, tests and Hivelore gate had all passed (field report 2026-09-05 §7). The
+  // exit gate waits for what could still refuse the change, not for everything that happens to run.
+  const pendingAll = runs.filter((run) => run.status !== "completed");
+  const pending = pendingAll.filter((run) => !isExternalTransientWorkflow(run));
+  const pendingExternal = pendingAll.filter(isExternalTransientWorkflow);
   if (pending.length > 0) {
     return [{
       severity: "error",
@@ -2932,6 +3031,16 @@ async function verifyGithubActionsForHead(
       impact: 50,
     }];
   }
+  const pendingExternalFinding: EnforcementFinding[] = pendingExternal.length > 0
+    ? [{
+        severity: "info",
+        code: "github-actions-external-pending",
+        message:
+          `${pendingExternal.length} external/advisory workflow run(s) for HEAD are still running (non-blocking): ` +
+          `${formatGithubRunNames(pendingExternal)}. Every core workflow has completed.`,
+        fix: "Check them later with `gh run watch <run-id>`; they are not required to finish.",
+      }]
+    : [];
 
   const failed = runs.filter((run) => run.conclusion !== "success");
   const failedCore = failed.filter((run) => !isExternalTransientWorkflow(run));
@@ -2949,8 +3058,8 @@ async function verifyGithubActionsForHead(
   }
 
   if (realFailed.length > 0) {
-    return [{
-      severity: "error",
+    return [...pendingExternalFinding, {
+      severity: "error" as const,
       code: "github-actions-failed",
       message: `${realFailed.length}/${runs.length} GitHub Actions workflow run(s) for HEAD did not pass: ${formatGithubRunNames(realFailed)}.`,
       fix: "Inspect the failed run logs with `gh run view <run-id> --log`, fix the issue, push the fix, then rerun `hivelore enforce finish`.",
@@ -2959,8 +3068,8 @@ async function verifyGithubActionsForHead(
   }
 
   if (infraFailed.length > 0) {
-    return [{
-      severity: "warn",
+    return [...pendingExternalFinding, {
+      severity: "warn" as const,
       code: "github-actions-infrastructure-failed",
       message:
         `${infraFailed.length}/${runs.length} workflow run(s) for HEAD failed on INFRASTRUCTURE steps only ` +
@@ -2975,18 +3084,20 @@ async function verifyGithubActionsForHead(
     // Don't let a flaky external integration (e.g. SonarQube network/timeout) masquerade as a
     // product regression. Hivelore's principle is zero hard dependency on the user's environment, so
     // external workflows are advisory: surfaced as info, never blocking `finish`.
-    return [{
-      severity: "info",
+    return [...pendingExternalFinding, {
+      severity: "info" as const,
       code: "github-actions-external-transient",
       message: `${failedExternal.length} external/transient workflow run(s) for HEAD did not pass (non-blocking): ${formatGithubRunNames(failedExternal)}. All core workflows passed.`,
       fix: "External integrations can fail on transient network/timeout. Re-run with `gh run rerun <run-id>` if you want them green — not required to finish.",
     }];
   }
 
-  return [{
-    severity: "ok",
+  return [...pendingExternalFinding, {
+    severity: "ok" as const,
     code: "github-actions-pass",
-    message: `All ${runs.length} GitHub Actions workflow run(s) for HEAD completed successfully.`,
+    message:
+      `All ${runs.length - pendingExternal.length} required GitHub Actions workflow run(s) for HEAD completed successfully` +
+      (pendingExternal.length > 0 ? ` (${pendingExternal.length} advisory run(s) still going)` : "") + ".",
   }];
 }
 
@@ -3005,10 +3116,14 @@ const INFRASTRUCTURE_STEP = /(upload|download)[- ]?artifact|actions\/(cache|setu
  */
 async function failedOnInfrastructureOnly(run: GithubActionsRun, root: string): Promise<boolean> {
   if (!run.databaseId) return false;
-  let jobs: { steps?: { name?: string; conclusion?: string | null }[] }[];
+  interface RunJob {
+    conclusion?: string | null;
+    steps?: { name?: string; conclusion?: string | null }[];
+  }
+  let jobs: RunJob[];
   try {
     const raw = await runCommand("gh", ["run", "view", String(run.databaseId), "--json", "jobs"], root);
-    jobs = (JSON.parse(raw) as { jobs?: typeof jobs }).jobs ?? [];
+    jobs = (JSON.parse(raw) as { jobs?: RunJob[] }).jobs ?? [];
   } catch {
     return false;
   }
@@ -3016,8 +3131,21 @@ async function failedOnInfrastructureOnly(run: GithubActionsRun, root: string): 
     .flatMap((job) => job.steps ?? [])
     .filter((step) => step.conclusion === "failure")
     .map((step) => step.name ?? "");
-  if (failedSteps.length === 0) return false; // job died before/outside its steps — can't attribute it
-  return failedSteps.every((name) => INFRASTRUCTURE_STEP.test(name));
+  if (failedSteps.length > 0) return failedSteps.every((name) => INFRASTRUCTURE_STEP.test(name));
+
+  // No failed step anywhere. Distinguish two very different cases:
+  //  - the runner never STARTED the job (no step ran at all) — an exhausted Actions minutes budget
+  //    stops every job in an account with "The job was not started because an Actions budget is
+  //    preventing further use". The build and the tests were never executed, so the run says
+  //    nothing about the change, and the agent cannot fix a billing state. Infrastructure (field
+  //    report 2026-09-05 §7).
+  //  - steps ran and none failed, yet the run failed (cancelled, workflow-level error, a bad
+  //    `if:`): unattributable, so it keeps blocking. Fail closed on the ambiguous case.
+  const failedJobs = jobs.filter((job) => job.conclusion !== "success" && job.conclusion !== "skipped");
+  if (failedJobs.length === 0) return false;
+  const ranNoSteps = (job: RunJob): boolean =>
+    (job.steps ?? []).every((step) => step.conclusion === null || step.conclusion === undefined || step.conclusion === "skipped");
+  return failedJobs.every(ranNoSteps);
 }
 
 /** External integrations whose failures are advisory (flaky network/timeout), not product
@@ -3373,7 +3501,7 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
   // Verbose paths (CI, --explain) keep the whole report; `--verbose` (quiet=false) restores it too.
   if (quiet && !report.should_block && changeActionable.length === 0) {
     const ok = report.findings.filter((f) => f.severity === "ok").length;
-    ui.success(`Hivelore gate passed${stageLabel(report)} — ${ok} check(s), 0 issue(s).`);
+    ui.success(`Hivelore gate passed${stageLabel(report)} — ${ok} check(s), 0 issue(s)${deferredLabel(report)}.`);
     return;
   }
 
@@ -3408,13 +3536,56 @@ function printReport(report: EnforcementReport, json: boolean, explain = false, 
     for (const finding of report.findings) printFinding(finding);
   }
   if (report.should_block) ui.error("Hivelore enforcement gate failed.");
-  else if (changeActionable.length > 0) ui.success(`Hivelore gate passed${stageLabel(report)} — ${changeActionable.length} advisory finding(s), 0 blocking.`);
-  else ui.success(`Hivelore enforcement gate passed${stageLabel(report)}.`);
+  else if (changeActionable.length > 0) ui.success(`Hivelore gate passed${stageLabel(report)} — ${changeActionable.length} advisory finding(s), 0 blocking${deferredLabel(report)}.`);
+  else ui.success(`Hivelore enforcement gate passed${stageLabel(report)}${deferredLabel(report)}.`);
   // A blocking rule can be a false positive. Name the escape hatch at the one moment it is natural —
   // the block itself — or friction is only ever reported into commit messages (field report §2.1).
   if (report.should_block && report.findings.some((f) => CONTENT_CATCH_CODES.has(f.code))) {
     console.log(ui.dim("  Blocked wrongly? Flag it with the `report_friction` MCP tool — a human reviews it, nothing is sent."));
   }
+}
+
+/**
+ * Which session is asking. Hook payloads carry the id; a bare CLI invocation does not, so fall back
+ * to the wrapper/harness env before "default". Without this the session-scoped briefing check would
+ * have nothing to scope to from the command line.
+ */
+function resolveSessionId(explicit?: string): string | undefined {
+  return (
+    explicit?.trim() ||
+    process.env.HIVELORE_SESSION_ID?.trim() ||
+    process.env.HAIVE_SESSION_ID?.trim() ||
+    process.env.CLAUDE_SESSION_ID?.trim() ||
+    undefined
+  );
+}
+
+/** POSIX single-quoting, so a failure summary containing quotes/newlines pastes as one argument. */
+function shellQuote(value: string): string {
+  return `'${value.replace(/\n/g, " ").replace(/'/g, `'\\''`)}'`;
+}
+
+/** Compact age for gate output: "12m", "3h", "2d" — a marker's age is the fact that made the
+ * session-recap and briefing findings misleading when it was omitted. */
+function formatAge(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+/** Codes that mean "this check did not run here". A pass line that hides them is the defect two
+ * field reports found on the same day (2026-09-05 §2, §4): twelve and eight PR descriptions
+ * respectively reported "enforce check: 0 issues" as a guarantee covering the sensor scan, which
+ * that stage had never evaluated. A gate never says "passed" about a check it skipped — the count
+ * is part of the sentence, in the human output, not only in `--json`. */
+const DEFERRED_CODES = new Set(["antipattern-gate-deferred"]);
+
+function deferredLabel(report: EnforcementReport): string {
+  const deferred = report.findings.filter((f) => DEFERRED_CODES.has(f.code));
+  if (deferred.length === 0) return "";
+  return `, ${deferred.length} deferred (${deferred.map((f) => f.code.replace(/-deferred$/, "")).join(", ")} — see \`--explain\`)`;
 }
 
 /** Name the hook/stage in the pass line so pre-commit (then pre-push on the same push) don't read
